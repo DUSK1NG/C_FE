@@ -38,18 +38,18 @@
 
 文件：修改 include/config.h、include/fem.h；创建 tests/test_stage2.c。
 
-- [ ] Step 1：增加容量宏
+- [x] Step 1：增加容量宏
 
 在 include/config.h 的 GEOMETRY_TOL 后加入：
 
     #define MAX_NODES 10
     #define MAX_DOF (2 * MAX_NODES)
 
-- [ ] Step 2：增加状态码和声明
+- [x] Step 2：增加状态码和声明
 
 在 FemStatus 末尾加入 FEM_INVALID_INDEX、FEM_CAPACITY_EXCEEDED；让 fem.h 包含 config.h，并加入上面的 assemble_global_stiffness 声明及中文有限元语义注释。
 
-- [ ] Step 3：写独立测试
+- [x] Step 3：写独立测试
 
 tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 矩阵；三个单元的长度和方向余弦；矩阵对称性；第 6 行/列之外的容量区域为零；非法节点索引清零并返回 FEM_INVALID_INDEX；MAX_NODES + 1 返回 FEM_CAPACITY_EXCEEDED；新增状态文本。
 
@@ -75,7 +75,7 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
 
 使用 Stage 1 的 expect_close / expect_status 风格，成功时输出 Stage 2 tests passed.。
 
-- [ ] Step 4：确认红状态并提交测试契约
+- [x] Step 4：确认红状态并提交测试契约
 
     gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage1.c src\fem.c -Iinclude -o stage1_tests.exe -lm
     gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage2.c src\fem.c -Iinclude -o stage2_tests.exe -lm
@@ -90,7 +90,7 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
 
 文件：修改 src/fem.c。
 
-- [ ] Step 1：增加完整矩阵清零函数
+- [x] Step 1：增加完整矩阵清零函数
 
     static void clear_global_matrix(double global_k[MAX_DOF][MAX_DOF])
     {
@@ -104,7 +104,7 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
         }
     }
 
-- [ ] Step 2：按固定流程实现组装
+- [x] Step 2：按固定流程实现组装
 
 实现 assemble_global_stiffness：先检查空指针、正数计数和 MAX_NODES；再清零矩阵并验证所有端点索引；逐个调用 Stage 1 的 calculate_element_geometry 与 calculate_element_stiffness；使用 int dof_map[4] = {2*node1, 2*node1+1, 2*node2, 2*node2+1}；双层循环执行 global_k[dof_map[a]][dof_map[b]] += ke[a][b]。任何中途错误都再次清零并返回原状态码。
 
@@ -133,14 +133,14 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
 
 代码实现不得留下未使用变量；必须在 -Wall -Wextra -pedantic 下无警告。函数注释需说明总体刚度矩阵是各单元刚度贡献按全局自由度累加的结果。
 
-- [ ] Step 3：补充状态文本
+- [x] Step 3：补充状态文本
 
     case FEM_INVALID_INDEX:
         return "invalid node index";
     case FEM_CAPACITY_EXCEEDED:
         return "model exceeds fixed node capacity";
 
-- [ ] Step 4：运行绿测试和 Stage 1 回归
+- [x] Step 4：运行绿测试和 Stage 1 回归
 
     gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage2.c src\fem.c -Iinclude -o stage2_tests.exe -lm
     .\stage2_tests.exe
@@ -149,7 +149,7 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
 
 预期分别输出 Stage 2 tests passed. 和 Stage 1 tests passed.，且无编译警告。
 
-- [ ] Step 5：提交实现
+- [x] Step 5：提交实现
 
     Remove-Item -LiteralPath '.\stage1_tests.exe', '.\stage2_tests.exe' -ErrorAction SilentlyContinue
     git add include\config.h include\fem.h src\fem.c tests\test_stage2.c
@@ -159,7 +159,7 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
 
 文件：修改本计划文档记录实际结果；不修改 Stage 1 代码、主程序、Dockerfile、Compose 或 .dockerignore。
 
-- [ ] Step 1：检查范围和空白错误
+- [x] Step 1：检查范围和空白错误
 
     git diff --check
     git status --short
@@ -167,7 +167,7 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
 
 确认没有 solver.c、matrix.c、io.c、postprocess.c、荷载向量或约束处理。
 
-- [ ] Step 2：检查环境
+- [ ] Step 2：检查环境（Docker 引擎待 WSL 2 就绪）
 
     gcc --version
     docker --version
@@ -179,10 +179,19 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
     docker compose build app
     docker compose run --rm app
 
-- [ ] Step 3：更新计划并提交记录
+- [x] Step 3：更新计划并提交记录
 
 将实际完成的步骤标记为 [x]，在文末写明测试输出、提交号和环境命令结果，然后提交：
 
     git add docs\superpowers\plans\2026-08-10-stage2-global-stiffness.md
     git commit -m "docs: record stage 2 assembly verification"
 
+## 执行结果（2026-08-10）
+
+- Stage 2 测试：通过，输出 `Stage 2 tests passed.`。
+- Stage 1 回归：通过，输出 `Stage 1 tests passed.`。
+- Stage 1 演示：通过，长度、方向余弦和 4×4 矩阵输出保持不变。
+- 编译器：MSYS2 UCRT64 GCC 16.1.0 已安装并可用。
+- Docker CLI/Compose：Docker 29.6.2、Compose 5.3.1 已安装。
+- Docker 引擎：未完成；当前 WSL 2 尚未就绪，`docker info` 超时，因此未宣称 Docker 构建验收通过。
+- 提交：`0b85c55`（测试契约）和 `cc33e8a`（组装实现）。
