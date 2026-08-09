@@ -1,0 +1,16 @@
+services:
+  dev:
+    build:
+      context: .
+      target: development
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    stdin_open: true
+    tty: true
+
+  app:
+    build:
+      context: .
+      target: runtime
+    image: c-fe:fem
