@@ -44,6 +44,15 @@ FemStatus identify_dofs(const Node *nodes,
                         int *constrained_count);
 
 /* 将状态码转换为可读错误信息。 */
+FemStatus solve_constrained_system(
+    const double global_k[MAX_DOF][MAX_DOF],
+    const double force[MAX_DOF],
+    const int free_dofs[MAX_DOF],
+    int free_count,
+    const int constrained_dofs[MAX_DOF],
+    int constrained_count,
+    double displacement[MAX_DOF]);
+
 const char *fem_status_message(FemStatus status);
 
 #endif
