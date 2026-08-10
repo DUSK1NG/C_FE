@@ -260,7 +260,7 @@ git commit -m "feat: add partial-pivot gaussian elimination"
 - Consumes: Task 2 的 solver 实现和全部既有阶段接口。
 - Produces: 可审查的 Stage 4 验收记录和干净的提交范围。
 
-- [ ] **Step 1: 编译并运行全部阶段测试**
+- [x] **Step 1: 编译并运行全部阶段测试**
 
 使用 UCRT64 GCC 依次运行下列四组命令，每条编译和运行命令都检查 LASTEXITCODE == 0：
 
@@ -278,7 +278,18 @@ gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c 
 
 四个测试分别应输出 Stage 1, Stage 2, Stage 3, Stage 4 passed.
 
-- [ ] **Step 2: 运行现有 Stage 1 示例程序**
+Actual command results:
+
+- `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage1.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1.exe" -lm` — exit `0`.
+- `& "$env:TEMP\c_fe_stage1.exe"` — exit `0`; output `Stage 1 tests passed.`
+- `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage2.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage2.exe" -lm` — exit `0`.
+- `& "$env:TEMP\c_fe_stage2.exe"` — exit `0`; output `Stage 2 tests passed.`
+- `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage3.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage3.exe" -lm` — exit `0`.
+- `& "$env:TEMP\c_fe_stage3.exe"` — exit `0`; output `Stage 3 tests passed.`
+- `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage4.exe" -lm` — exit `0`.
+- `& "$env:TEMP\c_fe_stage4.exe"` — exit `0`; output `Stage 4 tests passed.`
+
+- [x] **Step 2: 运行现有 Stage 1 示例程序**
 
 ~~~powershell
 gcc -std=c11 -Wall -Wextra -pedantic src\main.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1_demo.exe" -lm
@@ -287,7 +298,12 @@ gcc -std=c11 -Wall -Wextra -pedantic src\main.c src\fem.c -Iinclude -o "$env:TEM
 
 示例程序必须退出码为 0，并继续输出既有单元长度、方向余弦和 4×4 刚度矩阵。
 
-- [ ] **Step 3: 检查范围、禁止项和格式**
+Actual command results:
+
+- `gcc -std=c11 -Wall -Wextra -pedantic src\main.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1_demo.exe" -lm` — exit `0`.
+- `& "$env:TEMP\c_fe_stage1_demo.exe"` — exit `0`; output included unit length, direction cosines, and the 4×4 stiffness matrix.
+
+- [x] **Step 3: 检查范围、禁止项和格式**
 
 运行：
 
@@ -299,7 +315,9 @@ rg -n "build_reduced_system|Kff|Uf|displacement|solver\.c|solver\.h" src include
 
 允许出现 Stage 4 的 solver.c、solver.h、solve_linear_system 和测试引用；不得新增自由度缩减、位移恢复、文件输入、后处理或动态内存模块。确认 git status --short 只包含计划文档自身的验收记录变更。
 
-- [ ] **Step 4: 在计划中记录验收结果并提交文档**
+The exact Task 3 scope check was `git diff --name-status e1e6b2b70e3882fff89b696b0a0680f3c871e732..c5e421298b576baf41a22f67f28ef9a9dbe57790` — exit `0`; the only entry was `M docs/superpowers/plans/2026-08-10-gaussian-elimination.md`, representing the two documentation commits in the acceptance-record chain. The origin-branch comparison remains supplementary. `git diff --check` exited `0`.
+
+- [x] **Step 4: 在计划中记录验收结果并提交文档**
 
 记录实际使用的编译器版本、每个测试退出码、git diff --check 结果、提交 ID 和任何明确延期的非阻塞观察项，然后提交：
 
@@ -310,18 +328,18 @@ git commit -m "docs: record stage 4 verification"
 
 ## Self-Review Checklist
 
-- [ ] 设计文档中的接口、状态码、容差和失败清零语义全部有对应任务。
-- [ ] 测试覆盖普通求解、部分主元换行、3×3 回代、奇异矩阵、非有限输入、参数错误、输入不变和输出尾部清零。
-- [ ] 没有把 Stage 5 的自由度缩减或位移恢复提前加入 Stage 4。
-- [ ] Stage 1、Stage 2、Stage 3 既有测试和主程序输出保持兼容。
-- [ ] 所有编译使用 -std=c11 -Wall -Wextra -pedantic，且命令退出码被明确检查。
-- [ ] 计划中的实际提交 ID、测试结果和范围检查结果在完成后补齐。
+- [x] 设计文档中的接口、状态码、容差和失败清零语义全部有对应任务。
+- [x] 测试覆盖普通求解、部分主元换行、3×3 回代、奇异矩阵、非有限输入、参数错误、输入不变和输出尾部清零。
+- [x] 没有把 Stage 5 的自由度缩减或位移恢复提前加入 Stage 4。
+- [x] Stage 1、Stage 2、Stage 3 既有测试和主程序输出保持兼容。
+- [x] 所有编译使用 -std=c11 -Wall -Wextra -pedantic，且命令退出码被明确检查。
+- [x] 计划中的实际提交 ID、测试结果和范围检查结果在完成后补齐。
 
 ## Task 3 Acceptance Record
 
 - Verification date: 2026-08-10; workspace: `C:\Users\jking1\Desktop\my-project\c_FE-stage4-gaussian-elimination`.
 - Baseline before documentation: `e1e6b2b70e3882fff89b696b0a0680f3c871e732`.
-- Acceptance-record commit: `3b4e114984294847adf34e5f5b99874bebacdb8b` (`docs: record stage 4 verification`).
+- Acceptance-record commit chain: `3b4e114984294847adf34e5f5b99874bebacdb8b` (`docs: record stage 4 verification`) followed by `c5e421298b576baf41a22f67f28ef9a9dbe57790` (`docs: finalize stage 4 acceptance record`); current HEAD is the latter.
 - Compiler: UCRT64 GCC 16.1.0 (`gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`).
 - All requested test compile and run commands used `-std=c11 -Wall -Wextra -pedantic`, placed executables under `%TEMP%`, and exited 0:
   - Stage 1: `Stage 1 tests passed.`
