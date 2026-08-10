@@ -321,6 +321,7 @@ git commit -m "docs: record stage 4 verification"
 
 - Verification date: 2026-08-10; workspace: `C:\Users\jking1\Desktop\my-project\c_FE-stage4-gaussian-elimination`.
 - Baseline before documentation: `e1e6b2b70e3882fff89b696b0a0680f3c871e732`.
+- Acceptance-record commit: `3b4e114984294847adf34e5f5b99874bebacdb8b` (`docs: record stage 4 verification`).
 - Compiler: UCRT64 GCC 16.1.0 (`gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`).
 - All requested test compile and run commands used `-std=c11 -Wall -Wextra -pedantic`, placed executables under `%TEMP%`, and exited 0:
   - Stage 1: `Stage 1 tests passed.`
