@@ -15,10 +15,10 @@ COPY src ./src
 COPY tests ./tests
 
 RUN gcc -std=c11 -Wall -Wextra -pedantic \
-        src/main.c src/fem.c -Iinclude -o fem -lm
+        src/main.c src/fem.c src/solver.c -Iinclude -o fem -lm
 
 RUN gcc -std=c11 -Wall -Wextra -pedantic \
-        tests/test_stage1.c src/fem.c -Iinclude -o test_stage1 -lm
+        tests/test_stage1.c src/fem.c src/solver.c -Iinclude -o test_stage1 -lm
 
 RUN ./test_stage1
 
