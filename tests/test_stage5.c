@@ -121,10 +121,11 @@ static void test_preserves_supplied_free_order(void)
 {
     const int free_dofs[MAX_DOF] = {5, 2, 4};
     const int constrained_dofs[MAX_DOF] = {0, 1, 3};
+    const int natural_dofs[3] = {2, 4, 5};
     const double kff[3][3] = {{4.0, 1.0, 0.0},
                               {1.0, 3.0, 1.0},
                               {0.0, 1.0, 2.0}};
-    const double rhs[MAX_DOF] = {0.0, 0.0, 6.0, 0.0, 10.0, 8.0};
+    const double free_force[3] = {6.0, 10.0, 8.0};
     double global_k[MAX_DOF][MAX_DOF];
     double force[MAX_DOF];
     double displacement[MAX_DOF];
@@ -135,9 +136,9 @@ static void test_preserves_supplied_free_order(void)
     fill_vector(force, 0.0);
     fill_vector(displacement, 77.0);
     for (i = 0; i < 3; ++i) {
-        force[free_dofs[i]] = rhs[free_dofs[i]];
+        force[natural_dofs[i]] = free_force[i];
         for (j = 0; j < 3; ++j) {
-            global_k[free_dofs[i]][free_dofs[j]] = kff[2 - i][2 - j];
+            global_k[natural_dofs[i]][natural_dofs[j]] = kff[i][j];
         }
     }
 
@@ -155,13 +156,14 @@ static void test_zero_free_dofs_returns_zero_solution(void)
     double matrix[MAX_DOF][MAX_DOF];
     double force[MAX_DOF];
     double displacement[MAX_DOF];
+    const int free_dofs[MAX_DOF] = {0};
     const int constrained[MAX_DOF] = {0};
 
     fill_matrix(matrix, 0.0);
     fill_vector(force, 0.0);
     fill_vector(displacement, 77.0);
     expect_status("zero free DOFs",
-                  solve_constrained_system(CONST_MATRIX(matrix), force, NULL, 0,
+                  solve_constrained_system(CONST_MATRIX(matrix), force, free_dofs, 0,
                                            constrained, 1, displacement), FEM_OK);
     expect_zero_vector("zero free DOFs solution", displacement, MAX_DOF);
 }
