@@ -301,6 +301,8 @@ const char *fem_status_message(FemStatus status)
         return "constraint flags must be 0 or 1";
     case FEM_INVALID_LOAD:
         return "loads must be finite";
+    case FEM_SINGULAR_MATRIX:
+        return "matrix is singular or ill-conditioned";
     default:
         return "unknown FEM status";
     }
