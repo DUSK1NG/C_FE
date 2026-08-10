@@ -288,7 +288,7 @@ Remove-Item -LiteralPath $dockerStage6 -Force
 ```powershell
 git diff --check e0eafaf..HEAD
 git diff --name-status e0eafaf..HEAD
-rg -n "\b(malloc|calloc|realloc|free)\b" src include tests
+rg -n "\b(malloc|calloc|realloc|free)\s*\(" src include tests
 git status --short
 ```
 
@@ -306,6 +306,18 @@ git commit -m "docs: record stage 6 verification"
 ```
 
 ## Execution results (2026-08-10)
+
+### Final-review documentation correction
+
+- The static allocation check is intentionally focused on calls: `rg -n "\b(malloc|calloc|realloc|free)\s*\(" src include tests`. Exit code `1` with no output is the expected result when no allocation calls are present.
+- Do not use the broad word search `rg -n "\b(malloc|calloc|realloc|free)\b" src include tests` as allocation evidence: existing Stage 3/5 test labels use the word `free`, creating false positives without demonstrating allocation calls.
+- Pre-fix static-check record at `d0e4556`:
+  - `git diff --check e0eafaf..HEAD`: exit `0`; no output.
+  - `git diff --name-status e0eafaf..HEAD`: exit `0`; `M Dockerfile`; `A docs/superpowers/plans/2026-08-10-element-postprocess.md`; `A docs/superpowers/specs/2026-08-10-element-postprocess-design.md`; `A include/postprocess.h`; `A src/postprocess.c`; `A tests/test_stage6.c`.
+  - Focused allocation-call search: exit `1`; no output (expected).
+  - `git status --short`: exit `0`; no output.
+- The complete Stage 6 chain before the final-review fix commit is `e0eafaf..d0e4556`: design `129f19c` -> plan `ab060b8` -> tests `9f3a811` -> implementation `84d8dda` -> verification record `4b7675c` -> completion of verification record `d0e4556`.
+- After committing this documentation fix, record that commit's SHA in this verification record.
 
 - [x] Compiler: `C:\\msys64\\ucrt64\\bin\\gcc.exe`; `gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`; version-command exit code `0`.
 - [x] Stage 1: compile `0`, run `0`; output: `Stage 1 tests passed.`
