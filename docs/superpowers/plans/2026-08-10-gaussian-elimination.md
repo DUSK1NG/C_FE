@@ -316,3 +316,24 @@ git commit -m "docs: record stage 4 verification"
 - [ ] Stage 1、Stage 2、Stage 3 既有测试和主程序输出保持兼容。
 - [ ] 所有编译使用 -std=c11 -Wall -Wextra -pedantic，且命令退出码被明确检查。
 - [ ] 计划中的实际提交 ID、测试结果和范围检查结果在完成后补齐。
+
+## Task 3 Acceptance Record
+
+- Verification date: 2026-08-10; workspace: `C:\Users\jking1\Desktop\my-project\c_FE-stage4-gaussian-elimination`.
+- Baseline before documentation: `e1e6b2b70e3882fff89b696b0a0680f3c871e732`.
+- Compiler: UCRT64 GCC 16.1.0 (`gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`).
+- All requested test compile and run commands used `-std=c11 -Wall -Wextra -pedantic`, placed executables under `%TEMP%`, and exited 0:
+  - Stage 1: `Stage 1 tests passed.`
+  - Stage 2: `Stage 2 tests passed.`
+  - Stage 3: `Stage 3 tests passed.`
+  - Stage 4: `Stage 4 tests passed.`
+- Stage 1 example compile and run exited 0. Output retained the unit length, direction cosines, and 4x4 element stiffness matrix.
+- `git diff --check`: exit 0, no output.
+- `git diff --name-status origin/stage3-loads-constraints..HEAD`: exit 0; listed the pre-existing Stage 4 implementation/specification baseline files, not a Task 3 source change.
+- The required reference scan returned exit 0 with only allowed `solver.h`/`solver.c` references. The precise forbidden API and Stage 5 concept scans returned exit 1 for no matches; scripts explicitly interpreted that as the expected pass result.
+- Protected-file scan: no changes to `src/main.c`, Docker configuration, or Stage 1/2/3 test files. The Task 3 worktree was clean before this documentation update.
+- Temporary executables were removed and verified absent.
+- Non-blocking observation: GCC emitted existing `-Wmissing-field-initializers` warnings in Stage 1/2 tests and `src/main.c`; all compiles and runs still exited 0.
+- Full command transcript: `.superpowers/sdd/2026-08-10-gaussian-elimination/task-3-report.md`.
+
+Task 3 acceptance steps are complete after this record is committed.
