@@ -305,6 +305,23 @@ git add Dockerfile docs/superpowers/plans/2026-08-10-element-postprocess.md
 git commit -m "docs: record stage 6 verification"
 ```
 
+## Execution results (2026-08-10)
+
+- [x] Compiler: `C:\\msys64\\ucrt64\\bin\\gcc.exe`; `gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`; version-command exit code `0`.
+- [x] Stage 1: compile `0`, run `0`; output: `Stage 1 tests passed.`
+- [x] Stage 2: compile `0`, run `0`; output: `Stage 2 tests passed.`
+- [x] Stage 3: compile `0`, run `0`; output: `Stage 3 tests passed.`
+- [x] Stage 4: compile `0`, run `0`; output: `Stage 4 tests passed.`
+- [x] Stage 5: compile `0`, run `0`; output: `Stage 5 contract tests passed.`
+- [x] Stage 6: compile `0`, run `0`; output: `Stage 6 element postprocess contract tests passed.`
+- [x] Demo: compile `0`, run `0`; the Stage 1 single-element output remains `Length = 943.398113205660 mm`, `c = 0.529998940003`, `s = 0.847998304005`, and the existing stiffness matrix. Its source set remains `src/main.c src/fem.c src/solver.c`.
+- [x] Dockerfile-equivalent local check: `tests/test_stage6.c src/postprocess.c -Iinclude -o c_fe_stage6_docker_equivalent.exe -lm` compiled with exit `0` and ran with exit `0`; output: `Stage 6 element postprocess contract tests passed.`
+- [ ] Real Docker image build was not run. The `docker` CLI is unavailable: direct `docker version` invocation produced PowerShell `CommandNotFoundException`, so there is no Docker process exit code to record; `where.exe docker` actually returned `1`. No image or engine validation is claimed.
+- Existing warnings: Stage 1, Stage 2, and Demo compilation retain `-Wmissing-field-initializers` warnings for existing `Node` initializers that omit `fx`; every affected compile command exited `0`. This task did not alter those source files.
+- Commits: Task 1 `9f3a811` (`test: define stage 6 element postprocess contract`); Task 2 `84d8dda` (`feat: calculate stage 6 element results`). The Task 3 integration commit ID is recorded in the ignored task report.
+- Final Task 3 scope: Dockerfile adds a standalone Stage 6 compile/run pair after Stage 1 without changing the `fem` source list or `CMD ["./fem"]`; this plan appends the real verification record.
+- Non-blocking deferred Task 1 Minor: improve per-field failure labels in `expect_result_zero()`; it remains outside the permitted Task 3 source/test scope.
+
 ## 完成条件
 
 - Stage 6 设计规范与本计划均已提交。
