@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "config.h"
+#include "solver.h"
 
 static void clear_global_matrix(double global_k[MAX_DOF][MAX_DOF])
 {
@@ -33,6 +34,40 @@ static void clear_dof_array(int dofs[MAX_DOF])
     for (i = 0; i < MAX_DOF; ++i) {
         dofs[i] = 0;
     }
+}
+
+static FemStatus validate_dof_partition(
+    const int free_dofs[MAX_DOF],
+    int free_count,
+    const int constrained_dofs[MAX_DOF],
+    int constrained_count)
+{
+    int seen[MAX_DOF] = {0};
+    int i;
+    int dof;
+
+    if (free_count < 0 || constrained_count < 0) {
+        return FEM_INVALID_ARGUMENT;
+    }
+    if (free_count > MAX_DOF || constrained_count > MAX_DOF ||
+        free_count + constrained_count > MAX_DOF) {
+        return FEM_CAPACITY_EXCEEDED;
+    }
+    for (i = 0; i < free_count; ++i) {
+        dof = free_dofs[i];
+        if (dof < 0 || dof >= MAX_DOF || seen[dof] != 0) {
+            return FEM_INVALID_ARGUMENT;
+        }
+        seen[dof] = 1;
+    }
+    for (i = 0; i < constrained_count; ++i) {
+        dof = constrained_dofs[i];
+        if (dof < 0 || dof >= MAX_DOF || seen[dof] != 0) {
+            return FEM_INVALID_ARGUMENT;
+        }
+        seen[dof] = 1;
+    }
+    return FEM_OK;
 }
 
 FemStatus calculate_element_geometry(const Node *node_i,
@@ -279,6 +314,62 @@ FemStatus identify_dofs(const Node *nodes,
         }
     }
 
+    return FEM_OK;
+}
+
+FemStatus solve_constrained_system(
+    const double global_k[MAX_DOF][MAX_DOF],
+    const double force[MAX_DOF],
+    const int free_dofs[MAX_DOF],
+    int free_count,
+    const int constrained_dofs[MAX_DOF],
+    int constrained_count,
+    double displacement[MAX_DOF])
+{
+    double reduced_matrix[MAX_DOF][MAX_DOF] = {{0.0}};
+    double reduced_force[MAX_DOF] = {0.0};
+    double free_solution[MAX_DOF] = {0.0};
+    FemStatus status;
+    int i;
+    int j;
+
+    if (displacement != NULL) {
+        for (i = 0; i < MAX_DOF; ++i) {
+            displacement[i] = 0.0;
+        }
+    }
+    if (global_k == NULL || force == NULL || free_dofs == NULL ||
+        constrained_dofs == NULL || displacement == NULL) {
+        return FEM_INVALID_ARGUMENT;
+    }
+
+    status = validate_dof_partition(free_dofs, free_count,
+                                    constrained_dofs, constrained_count);
+    if (status != FEM_OK) {
+        return status;
+    }
+    if (free_count == 0) {
+        return FEM_OK;
+    }
+
+    for (i = 0; i < free_count; ++i) {
+        reduced_force[i] = force[free_dofs[i]];
+        for (j = 0; j < free_count; ++j) {
+            reduced_matrix[i][j] =
+                global_k[free_dofs[i]][free_dofs[j]];
+        }
+    }
+
+    status = solve_linear_system(
+                                 (const double (*)[MAX_DOF])reduced_matrix,
+                                 reduced_force,
+                                 free_count, free_solution);
+    if (status != FEM_OK) {
+        return status;
+    }
+    for (i = 0; i < free_count; ++i) {
+        displacement[free_dofs[i]] = free_solution[i];
+    }
     return FEM_OK;
 }
 

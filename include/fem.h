@@ -43,6 +43,16 @@ FemStatus identify_dofs(const Node *nodes,
                         int constrained_dofs[MAX_DOF],
                         int *constrained_count);
 
+/* 校验自由度分区，求解缩减系统，并将自由位移回填到完整向量。 */
+FemStatus solve_constrained_system(
+    const double global_k[MAX_DOF][MAX_DOF],
+    const double force[MAX_DOF],
+    const int free_dofs[MAX_DOF],
+    int free_count,
+    const int constrained_dofs[MAX_DOF],
+    int constrained_count,
+    double displacement[MAX_DOF]);
+
 /* 将状态码转换为可读错误信息。 */
 const char *fem_status_message(FemStatus status);
 
