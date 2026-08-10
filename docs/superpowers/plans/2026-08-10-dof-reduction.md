@@ -438,3 +438,5 @@ Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 - [x] `git status --short`: 无输出（本次文档修正之前），`git_status_exit=0`。
 - [x] `git diff --name-status caca61a..HEAD`: `M docs/superpowers/plans/2026-08-10-dof-reduction.md`、`M include/fem.h`、`M src/fem.c`、`A tests/test_stage5.c`，`git_scope_range_exit=0`。
 此范围中的代码/测试变更仅包括 `include/fem.h`、`src/fem.c` 和 `tests/test_stage5.c`；`docs/superpowers/plans/2026-08-10-dof-reduction.md` 是验证记录文档，不属于代码或测试范围。`af9da69` （`docs: record stage 5 verification`）是本次审查修正前的验证提交，已在本执行结果中明确记录。
+
+审查修正提交：`4a3ac1d` （`docs: correct stage 5 verification record`）。此提交包含可直接执行的命令记录、逐项实际退出码以及细分的代码/测试与文档范围说明。
