@@ -10,7 +10,8 @@
 
 static void expect_close(const char *name, double actual, double expected)
 {
-    if (fabs(actual - expected) > TEST_TOL) {
+    if (!isfinite(actual) || !isfinite(expected) ||
+        fabs(actual - expected) > TEST_TOL) {
         fprintf(stderr,
                 "FAIL: %s, actual = %.12f, expected = %.12f\n",
                 name,
@@ -113,6 +114,10 @@ static void test_dof_sets(void)
     int free_count = 0;
     int constrained_count = 0;
     int i;
+
+    fill_int_array(free_dofs, MAX_DOF, 77);
+    fill_int_array(constrained_dofs, MAX_DOF, 77);
+
     expect_status("dof sets",
                   identify_dofs(nodes, 3,
                                 free_dofs, &free_count,
@@ -126,6 +131,12 @@ static void test_dof_sets(void)
         if (free_dofs[i] != expected_free[i] ||
             constrained_dofs[i] != expected_constrained[i]) {
             fprintf(stderr, "FAIL: DOF mapping at index %d\n", i);
+            exit(EXIT_FAILURE);
+        }
+    }
+    for (i = 3; i < MAX_DOF; ++i) {
+        if (free_dofs[i] != 0 || constrained_dofs[i] != 0) {
+            fprintf(stderr, "FAIL: DOF tail was not cleared at %d\n", i);
             exit(EXIT_FAILURE);
         }
     }
@@ -154,17 +165,72 @@ static void test_invalid_constraint_clears_outputs(void)
     }
 }
 
-static void test_invalid_load_clears_vector(void)
+static void test_invalid_fix_y_clears_outputs(void)
 {
-    const Node nodes[2] = {
-        {1, 0.0, 0.0, NAN, 0.0, 0, 0},
-        {2, 1.0, 0.0, 0.0, INFINITY, 0, 0}
-    };
+    const Node nodes[1] = {{1, 0.0, 0.0, 0.0, 0.0, 0, 2}};
+    int free_dofs[MAX_DOF];
+    int constrained_dofs[MAX_DOF];
+    int free_count = 99;
+    int constrained_count = 99;
+
+    fill_int_array(free_dofs, MAX_DOF, 77);
+    fill_int_array(constrained_dofs, MAX_DOF, 77);
+    expect_status("invalid fix_y",
+                  identify_dofs(nodes, 1,
+                                free_dofs, &free_count,
+                                constrained_dofs, &constrained_count),
+                  FEM_INVALID_CONSTRAINT);
+    expect_zero_dofs(free_dofs);
+    expect_zero_dofs(constrained_dofs);
+    if (free_count != 0 || constrained_count != 0) {
+        fprintf(stderr, "FAIL: invalid fix_y counts\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void test_negative_constraint_clears_outputs(void)
+{
+    const Node nodes[1] = {{1, 0.0, 0.0, 0.0, 0.0, -1, 0}};
+    int free_dofs[MAX_DOF];
+    int constrained_dofs[MAX_DOF];
+    int free_count = 99;
+    int constrained_count = 99;
+
+    fill_int_array(free_dofs, MAX_DOF, 77);
+    fill_int_array(constrained_dofs, MAX_DOF, 77);
+    expect_status("negative constraint",
+                  identify_dofs(nodes, 1,
+                                free_dofs, &free_count,
+                                constrained_dofs, &constrained_count),
+                  FEM_INVALID_CONSTRAINT);
+    expect_zero_dofs(free_dofs);
+    expect_zero_dofs(constrained_dofs);
+    if (free_count != 0 || constrained_count != 0) {
+        fprintf(stderr, "FAIL: negative constraint counts\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void test_nan_load_clears_vector(void)
+{
+    const Node nodes[1] = {{1, 0.0, 0.0, NAN, 0.0, 0, 0}};
     double force[MAX_DOF];
 
     fill_double_array(force, MAX_DOF, 77.0);
-    expect_status("invalid load",
-                  build_force_vector(nodes, 2, force),
+    expect_status("NaN load",
+                  build_force_vector(nodes, 1, force),
+                  FEM_INVALID_LOAD);
+    expect_zero_force(force);
+}
+
+static void test_infinity_load_clears_vector(void)
+{
+    const Node nodes[1] = {{1, 0.0, 0.0, 0.0, INFINITY, 0, 0}};
+    double force[MAX_DOF];
+
+    fill_double_array(force, MAX_DOF, 77.0);
+    expect_status("infinity load",
+                  build_force_vector(nodes, 1, force),
                   FEM_INVALID_LOAD);
     expect_zero_force(force);
 }
@@ -232,6 +298,18 @@ static void test_invalid_arguments(void)
                   identify_dofs(&node, 1, NULL, &free_count,
                                 constrained_dofs, &constrained_count),
                   FEM_INVALID_ARGUMENT);
+    expect_status("null free count",
+                  identify_dofs(&node, 1, free_dofs, NULL,
+                                constrained_dofs, &constrained_count),
+                  FEM_INVALID_ARGUMENT);
+    expect_status("null constrained DOFs",
+                  identify_dofs(&node, 1, free_dofs, &free_count,
+                                NULL, &constrained_count),
+                  FEM_INVALID_ARGUMENT);
+    expect_status("null constrained count",
+                  identify_dofs(&node, 1, free_dofs, &free_count,
+                                constrained_dofs, NULL),
+                  FEM_INVALID_ARGUMENT);
     expect_status("non-positive DOF count",
                   identify_dofs(&node, 0, free_dofs, &free_count,
                                 constrained_dofs, &constrained_count),
@@ -256,7 +334,10 @@ int main(void)
     test_force_vector();
     test_dof_sets();
     test_invalid_constraint_clears_outputs();
-    test_invalid_load_clears_vector();
+    test_invalid_fix_y_clears_outputs();
+    test_negative_constraint_clears_outputs();
+    test_nan_load_clears_vector();
+    test_infinity_load_clears_vector();
     test_capacity_clears_outputs();
     test_invalid_arguments();
     test_status_messages();
