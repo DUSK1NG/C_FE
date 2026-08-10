@@ -353,7 +353,7 @@ git commit -m "docs: record stage 5 verification"
 
 ## 执行结果（2026-08-10）
 
-- [x] Task 3 Step 1: 使用 `C:\\msys64\\ucrt64\\bin\\gcc.exe` 执行计划中的完整 PowerShell 回归脚本，结果退出码为 0。临时可执行文件创建于 `%TEMP%\\c_fe_stage5_verify` 并在脚本结束时删除。
+- [x] Task 3 Step 1: 使用 `C:\\msys64\\ucrt64\\bin\\gcc.exe` 执行计划中的完整 PowerShell 回归脚本，结果退出码为 0。临时可执行文件位于 `$temp` （`Join-Path $env:TEMP 'c_fe_stage5_verify'`）并在脚本结束时删除。
   - `tests\\test_stage1.c`: `Stage 1 tests passed.`
   - `tests\\test_stage2.c`: `Stage 2 tests passed.`
   - `tests\\test_stage3.c`: `Stage 3 tests passed.`
@@ -361,6 +361,80 @@ git commit -m "docs: record stage 5 verification"
   - `tests\\test_stage5.c`: `Stage 5 contract tests passed.`
   - `src\\main.c` 示例已运行：输出 `Stage 1: single 2D truss element`、`Length = 943.398113205660 mm`、`c = 0.529998940003` 和 `s = 0.847998304005`。
 - [x] Task 3 Step 2: `git diff --check` 退出码 0；`rg --files src include tests` 退出码 0；`git status --short` 在记录前为空，未发现临时 `.exe` 产物。Git 命令以临时 `safe.directory=C:/Users/jking1/Desktop/my-project/c_FE-stage5-dof-reduction` 设置执行，未更改全局 Git 配置。
-- [x] 范围检查: `git diff --name-status caca61a..HEAD` 退出码 0，仅列出 `include/fem.h`、`src/fem.c` 和 `tests/test_stage5.c`。提交链为 `9e7da5b test: define stage 5 dof reduction contract`、`6983464 feat: reduce constrained system and recover displacements` 和 `6d6a612 test: correct stage 5 fixture construction`。
+- [x] 范围检查: `git diff --name-status caca61a..HEAD` 退出码 0，输出包含 `include/fem.h`、`src/fem.c`、`tests/test_stage5.c` 以及验证记录文档 `docs/superpowers/plans/2026-08-10-dof-reduction.md`。代码/测试文件范围仅为前三者；第四者仅是 Task 3 验证记录。提交链为 `9e7da5b test: define stage 5 dof reduction contract`、`6983464 feat: reduce constrained system and recover displacements`、`6d6a612 test: correct stage 5 fixture construction` 和 `af9da69 docs: record stage 5 verification`。
 - [x] 警告记录: 编译仍有 14 条 `-Wmissing-field-initializers` 警告，均指向既有 `Node.fx` 未显式初始化：`tests/test_stage1.c` 6 条、`tests/test_stage2.c` 6 条、`src/main.c` 2 条。它们未导致编译或运行失败。
 - Docker 验收未执行: `docker version` 无法识别 `docker` 命令（该环境未提供 Docker CLI/引擎）。本记录不宣称 Docker 验收通过。
+
+### 审查修正与重新执行（2026-08-10）
+
+以下是实际重新执行的 PowerShell 命令。其中 `$env:Path`、`$gcc` 和 `$temp` 为实际取值；临时目录只通过 `$env:TEMP` 与 `Join-Path` 构造。脚本在编译前清理 `$temp`，运行后删除该目录。
+
+~~~powershell
+$env:Path = 'C:\msys64\ucrt64\bin;' + $env:Path
+$gcc = 'C:\msys64\ucrt64\bin\gcc.exe'
+$temp = Join-Path $env:TEMP 'c_fe_stage5_verify'
+$safe = 'safe.directory=C:/Users/jking1/Desktop/my-project/c_FE-stage5-dof-reduction'
+Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $temp | Out-Null
+
+$stage1 = Join-Path $temp 'stage1.exe'
+& $gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage1.c src\fem.c src\solver.c -Iinclude -o $stage1 -lm
+$stage1Compile = $LASTEXITCODE
+& $stage1
+$stage1Run = $LASTEXITCODE
+
+$stage2 = Join-Path $temp 'stage2.exe'
+& $gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage2.c src\fem.c src\solver.c -Iinclude -o $stage2 -lm
+$stage2Compile = $LASTEXITCODE
+& $stage2
+$stage2Run = $LASTEXITCODE
+
+$stage3 = Join-Path $temp 'stage3.exe'
+& $gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage3.c src\fem.c src\solver.c -Iinclude -o $stage3 -lm
+$stage3Compile = $LASTEXITCODE
+& $stage3
+$stage3Run = $LASTEXITCODE
+
+$stage4 = Join-Path $temp 'stage4.exe'
+& $gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\fem.c src\solver.c -Iinclude -o $stage4 -lm
+$stage4Compile = $LASTEXITCODE
+& $stage4
+$stage4Run = $LASTEXITCODE
+
+$stage5 = Join-Path $temp 'stage5.exe'
+& $gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage5.c src\fem.c src\solver.c -Iinclude -o $stage5 -lm
+$stage5Compile = $LASTEXITCODE
+& $stage5
+$stage5Run = $LASTEXITCODE
+
+$demo = Join-Path $temp 'demo.exe'
+& $gcc -std=c11 -Wall -Wextra -pedantic src\main.c src\fem.c src\solver.c -Iinclude -o $demo -lm
+$demoCompile = $LASTEXITCODE
+& $demo
+$demoRun = $LASTEXITCODE
+
+git -c $safe diff --check
+$diffCheck = $LASTEXITCODE
+rg --files src include tests
+$rgScope = $LASTEXITCODE
+git -c $safe status --short
+$statusCheck = $LASTEXITCODE
+git -c $safe diff --name-status caca61a..HEAD
+$rangeCheck = $LASTEXITCODE
+
+Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+~~~
+
+实际重新执行输出与退出码：
+
+- [x] Stage 1: 编译 `stage1_compile_exit=0`；运行 `Stage 1 tests passed.`、`stage1_run_exit=0`。
+- [x] Stage 2: 编译 `stage2_compile_exit=0`；运行 `Stage 2 tests passed.`、`stage2_run_exit=0`。
+- [x] Stage 3: 编译 `stage3_compile_exit=0`；运行 `Stage 3 tests passed.`、`stage3_run_exit=0`。
+- [x] Stage 4: 编译 `stage4_compile_exit=0`；运行 `Stage 4 tests passed.`、`stage4_run_exit=0`。
+- [x] Stage 5: 编译 `stage5_compile_exit=0`；运行 `Stage 5 contract tests passed.`、`stage5_run_exit=0`。
+- [x] Stage 1 demo: 编译 `demo_compile_exit=0`；运行 `Stage 1: single 2D truss element`、`Length = 943.398113205660 mm`、`c = 0.529998940003`、`s = 0.847998304005`、`demo_run_exit=0`。
+- [x] `git diff --check`: 无输出，`git_diff_check_exit=0`。
+- [x] `rg --files src include tests`: 输出 12 个源码/头文件/测试文件，`rg_scope_exit=0`。
+- [x] `git status --short`: 无输出（本次文档修正之前），`git_status_exit=0`。
+- [x] `git diff --name-status caca61a..HEAD`: `M docs/superpowers/plans/2026-08-10-dof-reduction.md`、`M include/fem.h`、`M src/fem.c`、`A tests/test_stage5.c`，`git_scope_range_exit=0`。
+此范围中的代码/测试变更仅包括 `include/fem.h`、`src/fem.c` 和 `tests/test_stage5.c`；`docs/superpowers/plans/2026-08-10-dof-reduction.md` 是验证记录文档，不属于代码或测试范围。`af9da69` （`docs: record stage 5 verification`）是本次审查修正前的验证提交，已在本执行结果中明确记录。
