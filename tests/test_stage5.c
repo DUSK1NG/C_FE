@@ -37,6 +37,17 @@ static void expect_zero_vector(const char *name, const double *values, int count
     }
 }
 
+static void expect_bytes_unchanged(const char *name,
+                                   const void *actual,
+                                   const void *expected,
+                                   size_t size)
+{
+    if (memcmp(actual, expected, size) != 0) {
+        fprintf(stderr, "FAIL: %s changed\n", name);
+        exit(EXIT_FAILURE);
+    }
+}
+
 static void fill_matrix(double matrix[MAX_DOF][MAX_DOF], double value)
 {
     int i;
@@ -259,6 +270,34 @@ static void test_out_of_range_dof_clears_solution(void)
                        MAX_DOF);
 }
 
+static void test_negative_dof_clears_solution(void)
+{
+    double matrix[MAX_DOF][MAX_DOF];
+    double force[MAX_DOF];
+    double displacement[MAX_DOF];
+    int free_dofs[MAX_DOF] = {-1};
+    int constrained_dofs[MAX_DOF] = {0};
+
+    fill_matrix(matrix, 0.0);
+    fill_vector(force, 0.0);
+    fill_vector(displacement, 77.0);
+    expect_status("negative free DOF",
+                  solve_constrained_system(CONST_MATRIX(matrix), force, free_dofs, 1,
+                                           constrained_dofs, 1, displacement),
+                  FEM_INVALID_ARGUMENT);
+    expect_zero_vector("negative free DOF solution", displacement, MAX_DOF);
+
+    free_dofs[0] = 0;
+    constrained_dofs[0] = -1;
+    fill_vector(displacement, 77.0);
+    expect_status("negative constrained DOF",
+                  solve_constrained_system(CONST_MATRIX(matrix), force, free_dofs, 1,
+                                           constrained_dofs, 1, displacement),
+                  FEM_INVALID_ARGUMENT);
+    expect_zero_vector("negative constrained DOF solution", displacement,
+                       MAX_DOF);
+}
+
 static void test_duplicate_or_overlapping_dof_clears_solution(void)
 {
     double matrix[MAX_DOF][MAX_DOF];
@@ -308,6 +347,13 @@ static void test_count_over_capacity_clears_solution(void)
     expect_zero_vector("free count over capacity solution", displacement,
                        MAX_DOF);
     fill_vector(displacement, 77.0);
+    expect_status("constrained count over capacity",
+                  solve_constrained_system(CONST_MATRIX(matrix), force, dofs, 0,
+                                           dofs, MAX_DOF + 1, displacement),
+                  FEM_CAPACITY_EXCEEDED);
+    expect_zero_vector("constrained count over capacity solution", displacement,
+                       MAX_DOF);
+    fill_vector(displacement, 77.0);
     expect_status("total count over capacity",
                   solve_constrained_system(CONST_MATRIX(matrix), force, dofs, MAX_DOF,
                                            dofs, 1, displacement),
@@ -323,6 +369,10 @@ static void test_singular_reduced_system_clears_solution(void)
     double matrix[MAX_DOF][MAX_DOF];
     double force[MAX_DOF];
     double displacement[MAX_DOF];
+    double matrix_copy[MAX_DOF][MAX_DOF];
+    double force_copy[MAX_DOF];
+    int free_copy[MAX_DOF];
+    int constrained_copy[MAX_DOF];
     int i;
 
     fill_matrix(matrix, 0.0);
@@ -331,12 +381,59 @@ static void test_singular_reduced_system_clears_solution(void)
         force[free_dofs[i]] = (double)(i + 1);
         matrix[free_dofs[0]][free_dofs[i]] = (double)(i + 1);
     }
+    memcpy(matrix_copy, matrix, sizeof(matrix_copy));
+    memcpy(force_copy, force, sizeof(force_copy));
+    memcpy(free_copy, free_dofs, sizeof(free_copy));
+    memcpy(constrained_copy, constrained_dofs, sizeof(constrained_copy));
     fill_vector(displacement, 77.0);
     expect_status("singular reduced system",
                   solve_constrained_system(CONST_MATRIX(matrix), force, free_dofs, 3,
                                            constrained_dofs, 3, displacement),
                   FEM_SINGULAR_MATRIX);
     expect_zero_vector("singular solution", displacement, MAX_DOF);
+    expect_bytes_unchanged("singular matrix", matrix, matrix_copy,
+                           sizeof(matrix));
+    expect_bytes_unchanged("singular force", force, force_copy, sizeof(force));
+    expect_bytes_unchanged("singular free DOFs", free_dofs, free_copy,
+                           sizeof(free_dofs));
+    expect_bytes_unchanged("singular constrained DOFs", constrained_dofs,
+                           constrained_copy, sizeof(constrained_dofs));
+}
+
+static void test_nonfinite_reduced_input_preserves_inputs(void)
+{
+    const int free_dofs[MAX_DOF] = {2};
+    const int constrained_dofs[MAX_DOF] = {0};
+    double matrix[MAX_DOF][MAX_DOF];
+    double force[MAX_DOF];
+    double displacement[MAX_DOF];
+    double matrix_copy[MAX_DOF][MAX_DOF];
+    double force_copy[MAX_DOF];
+    int free_copy[MAX_DOF];
+    int constrained_copy[MAX_DOF];
+
+    fill_matrix(matrix, 0.0);
+    matrix[2][2] = 1.0;
+    fill_vector(force, 0.0);
+    force[2] = NAN;
+    memcpy(matrix_copy, matrix, sizeof(matrix_copy));
+    memcpy(force_copy, force, sizeof(force_copy));
+    memcpy(free_copy, free_dofs, sizeof(free_copy));
+    memcpy(constrained_copy, constrained_dofs, sizeof(constrained_copy));
+    fill_vector(displacement, 77.0);
+
+    expect_status("nonfinite reduced input",
+                  solve_constrained_system(CONST_MATRIX(matrix), force, free_dofs, 1,
+                                           constrained_dofs, 1, displacement),
+                  FEM_INVALID_ARGUMENT);
+    expect_zero_vector("nonfinite reduced input solution", displacement, MAX_DOF);
+    expect_bytes_unchanged("nonfinite matrix", matrix, matrix_copy,
+                           sizeof(matrix));
+    expect_bytes_unchanged("nonfinite force", force, force_copy, sizeof(force));
+    expect_bytes_unchanged("nonfinite free DOFs", free_dofs, free_copy,
+                           sizeof(free_dofs));
+    expect_bytes_unchanged("nonfinite constrained DOFs", constrained_dofs,
+                           constrained_copy, sizeof(constrained_dofs));
 }
 
 int main(void)
@@ -347,9 +444,11 @@ int main(void)
     test_null_argument_clears_solution();
     test_negative_counts_clear_solution();
     test_out_of_range_dof_clears_solution();
+    test_negative_dof_clears_solution();
     test_duplicate_or_overlapping_dof_clears_solution();
     test_count_over_capacity_clears_solution();
     test_singular_reduced_system_clears_solution();
+    test_nonfinite_reduced_input_preserves_inputs();
 
     printf("Stage 5 contract tests passed.\n");
     return EXIT_SUCCESS;
