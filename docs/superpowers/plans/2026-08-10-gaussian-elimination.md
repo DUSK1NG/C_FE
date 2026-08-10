@@ -4,7 +4,7 @@
 
 **Goal:** 在固定容量二维桁架项目中加入不修改输入的带部分主元高斯消元，用于求解独立的方阵线性系统。
 
-**Architecture:** 新增独立的 solver.c/solver.h 模块，使用 MAX_DOF 固定容量局部工作区复制输入矩阵和右端项，先前向消元再回代。求解器只负责 A x = b，不处理 Stage 3 的自由度缩减，也不改造主程序。
+**Architecture:** 新增独立的 solver.c/solver.h 模块，使用 MAX_DOF 固定容量局部工作区，以矩阵和右端项的公共二次幂尺度归一化只读输入后先前向消元再回代。求解器只负责 A x = b，不处理 Stage 3 的自由度缩减，也不改造主程序。
 
 **Tech Stack:** C11、GCC/MinGW-w64、固定容量 C 数组、math.h、现有 FemStatus 和 MAX_DOF 配置。
 
@@ -21,6 +21,7 @@
 - 奇异或近奇异矩阵返回新增的 FEM_SINGULAR_MATRIX，不得产生部分解。
 - 使用独立的 SOLVER_TOL = 1.0e-12，主元阈值为 SOLVER_TOL * max(1.0, matrix_scale)；不得用 == 0 判断浮点主元。
 - 使用部分主元交换：每个主元列选择当前列候选区域内绝对值最大的元素并交换行。
+- 矩阵和右端项在固定容量工作区中按其公共最大指数确定的二次幂尺度归一化，主元阈值按同一尺度换算；所有消元、右端项、回代和最终解的非有限结果均清零并返回 FEM_SINGULAR_MATRIX。
 - 不引入动态内存、第三方矩阵库、自由度缩减、位移恢复、文件输入、后处理或主程序流程改造。
 - Stage 1、Stage 2、Stage 3 既有算法和测试保持兼容。
 
@@ -180,9 +181,10 @@ static int is_finite_system(const double matrix[MAX_DOF][MAX_DOF],
                             const double rhs[MAX_DOF],
                             int size);
 static double matrix_scale(const double matrix[MAX_DOF][MAX_DOF], int size);
+static double rhs_scale(const double rhs[MAX_DOF], int size);
 ~~~
 
-clear_solution 清零完整容量；is_finite_system 只检查有效区域；matrix_scale 返回有效矩阵项绝对值的最大值。
+clear_solution 清零完整容量；is_finite_system 只检查有效区域；matrix_scale 和 rhs_scale 分别返回有效矩阵与右端项绝对值的最大值。
 
 - [ ] **Step 2: 实现参数检查和局部工作区复制**
 
@@ -203,18 +205,18 @@ if (!is_finite_system(matrix, rhs, size)) {
 }
 ~~~
 
-然后将 matrix[0..size)、rhs[0..size) 复制到 work_matrix 与 work_rhs，不能直接在输入数组上消元。
+然后根据 matrix_scale 和 rhs_scale 较大值的二进制指数选择公共二次幂尺度，使用 frexp/scalbn 将 matrix[0..size)、rhs[0..size) 同尺度缩放后复制到 work_matrix 与 work_rhs。该操作保持方程组等价，避免任意除数对极值比例引入额外舍入，且不能直接在输入数组上消元。原始主元阈值也使用同一二次幂缩放，以保持既有奇异判定语义。
 
 - [ ] **Step 3: 实现部分主元前向消元**
 
 对每个 pivot = 0..size-1：
 1. 在行 pivot..size-1 中寻找当前列绝对值最大的候选行；
-2. 计算 pivot_threshold = SOLVER_TOL * fmax(1.0, matrix_scale)；
+2. 计算原始阈值 SOLVER_TOL * fmax(1.0, matrix_scale)，再使用公共二次幂尺度换算工作区 pivot_threshold；
 3. 若最大绝对值 <= pivot_threshold，返回 FEM_SINGULAR_MATRIX；
 4. 将候选行与当前行交换；
-5. 对每个 row = pivot + 1..size-1，计算消元因子并更新当前行的剩余列及右端项。
+5. 对每个 row = pivot + 1..size-1，计算消元因子并更新当前行的剩余列及右端项，对乘积和更新结果逐项执行 isfinite 检查。
 
-更新从当前主元列开始，随后将已消去的列显式置为 0.0，避免残余舍入值影响回代。
+更新从主元右侧的剩余列开始，并将已消去的主元列显式置为 0.0，避免残余舍入值影响回代。
 
 - [ ] **Step 4: 实现回代和状态文本**
 
@@ -224,7 +226,7 @@ if (!is_finite_system(matrix, rhs, size)) {
 solution[row] = (work_rhs[row] - sum) / work_matrix[row][row];
 ~~~
 
-回代前再次检查对角主元是否不超过同一阈值；失败时清零并返回 FEM_SINGULAR_MATRIX。成功后保持输出尾部零值。
+回代前再次检查对角主元是否不超过同一阈值；回代乘积、累加、分子、商和最终解均执行 isfinite 检查。任何计算期非有限值或主元失败都清零并返回 FEM_SINGULAR_MATRIX；非有限输入仍返回 FEM_INVALID_ARGUMENT。成功后保持输出尾部零值，本轮不新增状态码。
 
 在 fem_status_message 中加入：
 
@@ -339,7 +341,7 @@ git commit -m "docs: record stage 4 verification"
 
 - Verification date: 2026-08-10; workspace: `C:\Users\jking1\Desktop\my-project\c_FE-stage4-gaussian-elimination`.
 - Baseline before documentation: `e1e6b2b70e3882fff89b696b0a0680f3c871e732`.
-- Acceptance-record commit chain: `3b4e114984294847adf34e5f5b99874bebacdb8b` (`docs: record stage 4 verification`) followed by `c5e421298b576baf41a22f67f28ef9a9dbe57790` (`docs: finalize stage 4 acceptance record`); current HEAD is the latter.
+- Historical acceptance-record commit chain: `3b4e114984294847adf34e5f5b99874bebacdb8b` (`docs: record stage 4 verification`) followed by `c5e421298b576baf41a22f67f28ef9a9dbe57790` (`docs: finalize stage 4 acceptance record`). This record identifies those commits only and intentionally makes no claim about the moving current HEAD.
 - Compiler: UCRT64 GCC 16.1.0 (`gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`).
 - All requested test compile and run commands used `-std=c11 -Wall -Wextra -pedantic`, placed executables under `%TEMP%`, and exited 0:
   - Stage 1: `Stage 1 tests passed.`
@@ -353,6 +355,39 @@ git commit -m "docs: record stage 4 verification"
 - Protected-file scan: no changes to `src/main.c`, Docker configuration, or Stage 1/2/3 test files. The Task 3 worktree was clean before this documentation update.
 - Temporary executables were removed and verified absent.
 - Non-blocking observation: GCC emitted existing `-Wmissing-field-initializers` warnings in Stage 1/2 tests and `src/main.c`; all compiles and runs still exited 0.
-- Full command transcript: `.superpowers/sdd/2026-08-10-gaussian-elimination/task-3-report.md`.
+- The tracked per-command entries and exit codes in this plan are the durable verification record. Any ignored `.superpowers/sdd` transcript is supplemental and is not required after merge.
 
 Task 3 acceptance steps are complete after this record is committed.
+
+## Final Review Fix Acceptance Record
+
+- Fix-wave date: 2026-08-10; baseline: `e126f08e99628191c6c0c91a09546c13842baf0d`; workspace: `C:\Users\jking1\Desktop\my-project\c_FE-stage4-gaussian-elimination`.
+- Compiler identification: `C:\msys64\ucrt64\bin\gcc.exe --version` — exit `0`; first line `gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`.
+- TDD regression proof before the solver fix:
+  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage4_red.exe" -lm` — exit `0`, no warnings after correcting the two-dimensional test helper signature.
+  - `& "$env:TEMP\c_fe_stage4_red.exe"` — exit `1`; output `FAIL: DBL_MAX solution[0], actual = -nan(ind), expected = 0.000000000000`.
+- Completion-review scaling boundary proof:
+  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage4_power_scale_red.exe" -lm` — exit `0`, no output.
+  - `& "$env:TEMP\c_fe_stage4_power_scale_red.exe"` — exit `1`; output `FAIL: DBL_MAX finite solution, actual status = 8, expected status = 0`, demonstrating the rounding defect in direct maximum-value division.
+  - After switching to common power-of-two scaling, the same compile command with output `$env:TEMP\c_fe_stage4_power_scale_green.exe` exited `0`, and that executable exited `0` with `Stage 4 tests passed.`
+- Final Stage 4 and focused regression verification:
+  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage4_final.exe" -lm` — exit `0`, no output.
+  - `& "$env:TEMP\c_fe_stage4_final.exe" --extreme-scale` — exit `0`; output `Stage 4 DBL_MAX regression passed.`
+  - `& "$env:TEMP\c_fe_stage4_final.exe"` — exit `0`; output `Stage 4 tests passed.`
+- Full Stage 1–4 and Stage 1 example regression:
+  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage1.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1_final.exe" -lm` — exit `0`; emitted only the pre-existing `Node.fx` missing-initializer warnings.
+  - `& "$env:TEMP\c_fe_stage1_final.exe"` — exit `0`; output `Stage 1 tests passed.`
+  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage2.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage2_final.exe" -lm` — exit `0`; emitted only the pre-existing `Node.fx` missing-initializer warnings.
+  - `& "$env:TEMP\c_fe_stage2_final.exe"` — exit `0`; output `Stage 2 tests passed.`
+  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage3.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage3_final.exe" -lm` — exit `0`, no output.
+  - `& "$env:TEMP\c_fe_stage3_final.exe"` — exit `0`; output `Stage 3 tests passed.`
+  - Stage 4 compile/run results are recorded in the preceding focused-verification list and form the Stage 4 portion of the full regression.
+  - `gcc -std=c11 -Wall -Wextra -pedantic src\main.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1_demo_final.exe" -lm` — exit `0`; emitted only the pre-existing `Node.fx` missing-initializer warnings.
+  - `& "$env:TEMP\c_fe_stage1_demo_final.exe"` — exit `0`; output retained length `943.398113205660 mm`, direction cosines, and the 4×4 stiffness matrix.
+- Scope and formatting checks:
+  - `git -c core.autocrlf=false diff --check` — exit `0`, no output.
+  - `git diff --name-status` — exit `0`; only this plan, the Stage 4 design, `src/solver.c`, and `tests/test_stage4.c` were modified.
+  - `git diff --name-only -- src\main.c Dockerfile compose.yaml tests\test_stage1.c tests\test_stage2.c tests\test_stage3.c` — exit `0`, no output.
+  - The guarded `rg` scan for Stage 5 APIs/concepts and dynamic-memory calls — exit `0`; output `no forbidden Stage 5 or dynamic-memory matches`.
+- Arithmetic failures from finite inputs reuse `FEM_SINGULAR_MATRIX`; no status code, status text, or public header change was required. Non-finite inputs retain `FEM_INVALID_ARGUMENT`. Common power-of-two scaling preserves representable extreme solutions such as `A=[1], b=[DBL_MAX]` while bounding the reviewed elimination case.
+- The tracked entries above are the durable final-fix command and exit-code record; the ignored final SDD report is supplemental.

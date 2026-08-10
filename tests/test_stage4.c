@@ -1,3 +1,4 @@
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,8 +57,8 @@ static void fill_vector(double values[MAX_DOF], double value)
 }
 
 static void expect_matrix_unchanged(
-    const double *actual,
-    const double *expected)
+    const double actual[MAX_DOF][MAX_DOF],
+    double expected[MAX_DOF][MAX_DOF])
 {
     int i;
     int j;
@@ -66,9 +67,7 @@ static void expect_matrix_unchanged(
         for (j = 0; j < MAX_DOF; ++j) {
             char name[64];
             snprintf(name, sizeof(name), "matrix[%d][%d] unchanged", i, j);
-            expect_close(name,
-                         actual[i * MAX_DOF + j],
-                         expected[i * MAX_DOF + j]);
+            expect_close(name, actual[i][j], expected[i][j]);
         }
     }
 }
@@ -102,6 +101,66 @@ static void test_partial_pivoting(void)
                   solve_linear_system(matrix, rhs, 2, solution), FEM_OK);
     expect_close("pivot solution[0]", solution[0], 1.0);
     expect_close("pivot solution[1]", solution[1], 2.0);
+}
+
+static void test_selects_largest_absolute_pivot(void)
+{
+    const double matrix[MAX_DOF][MAX_DOF] = {
+        {1.0e-20, 1.0},
+        {1.0, 1.0}
+    };
+    const double rhs[MAX_DOF] = {1.0, 2.0};
+    double solution[MAX_DOF];
+
+    expect_status("largest absolute pivot",
+                  solve_linear_system(matrix, rhs, 2, solution), FEM_OK);
+    expect_close("largest pivot solution[0]", solution[0], 1.0);
+    expect_close("largest pivot solution[1]", solution[1], 1.0);
+}
+
+static void test_extreme_scale_well_conditioned_system(void)
+{
+    const double matrix[MAX_DOF][MAX_DOF] = {
+        {DBL_MAX, DBL_MAX},
+        {-DBL_MAX, DBL_MAX}
+    };
+    const double rhs[MAX_DOF] = {DBL_MAX, DBL_MAX};
+    double solution[MAX_DOF];
+
+    expect_status("DBL_MAX well-conditioned system",
+                  solve_linear_system(matrix, rhs, 2, solution), FEM_OK);
+    expect_close("DBL_MAX solution[0]", solution[0], 0.0);
+    expect_close("DBL_MAX solution[1]", solution[1], 1.0);
+    expect_zero_vector("DBL_MAX solution tail",
+                       solution + 2,
+                       MAX_DOF - 2);
+}
+
+static void test_extreme_rhs_with_finite_solution(void)
+{
+    const double matrix[MAX_DOF][MAX_DOF] = {{1.0}};
+    const double rhs[MAX_DOF] = {DBL_MAX};
+    double solution[MAX_DOF];
+
+    expect_status("DBL_MAX finite solution",
+                  solve_linear_system(matrix, rhs, 1, solution), FEM_OK);
+    expect_close("DBL_MAX finite solution[0]", solution[0], DBL_MAX);
+    expect_zero_vector("DBL_MAX finite solution tail",
+                       solution + 1,
+                       MAX_DOF - 1);
+}
+
+static void test_nonfinite_solution_is_rejected(void)
+{
+    const double matrix[MAX_DOF][MAX_DOF] = {{2.0e-12}};
+    const double rhs[MAX_DOF] = {DBL_MAX};
+    double solution[MAX_DOF];
+
+    fill_vector(solution, 77.0);
+    expect_status("nonfinite solution",
+                  solve_linear_system(matrix, rhs, 1, solution),
+                  FEM_SINGULAR_MATRIX);
+    expect_zero_vector("nonfinite solution cleared", solution, MAX_DOF);
 }
 
 static void test_three_by_three_system(void)
@@ -212,7 +271,7 @@ static void test_input_unchanged(void)
     memcpy(rhs_copy, rhs, sizeof(rhs_copy));
     expect_status("input unchanged solve",
                   solve_linear_system(matrix, rhs, 3, solution), FEM_OK);
-    expect_matrix_unchanged(&matrix[0][0], &matrix_copy[0][0]);
+    expect_matrix_unchanged(matrix, matrix_copy);
     for (i = 0; i < MAX_DOF; ++i) {
         char name[64];
         snprintf(name, sizeof(name), "rhs[%d] unchanged", i);
@@ -243,17 +302,31 @@ static void test_tail_is_zero(void)
 static void test_status_message(void)
 {
     const char *message = fem_status_message(FEM_SINGULAR_MATRIX);
+    const char *expected = "matrix is singular or ill-conditioned";
 
-    if (message == NULL || message[0] == '\0') {
-        fprintf(stderr, "FAIL: singular status message is empty\n");
+    if (message == NULL || strcmp(message, expected) != 0) {
+        fprintf(stderr,
+                "FAIL: singular status message, actual = %s, expected = %s\n",
+                message == NULL ? "(null)" : message,
+                expected);
         exit(EXIT_FAILURE);
     }
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    if (argc == 2 && strcmp(argv[1], "--extreme-scale") == 0) {
+        test_extreme_scale_well_conditioned_system();
+        printf("Stage 4 DBL_MAX regression passed.\n");
+        return EXIT_SUCCESS;
+    }
+
     test_two_by_two_system();
     test_partial_pivoting();
+    test_selects_largest_absolute_pivot();
+    test_extreme_scale_well_conditioned_system();
+    test_extreme_rhs_with_finite_solution();
+    test_nonfinite_solution_is_rejected();
     test_three_by_three_system();
     test_singular_matrix();
     test_invalid_arguments();
