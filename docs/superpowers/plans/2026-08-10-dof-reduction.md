@@ -19,7 +19,7 @@
 - 单个计数或计数之和超过 MAX_DOF 返回 FEM_CAPACITY_EXCEEDED。
 - free_count == 0 在其他参数和 DOF 集合合法时返回 FEM_OK，不调用线性求解器，完整位移保持为零。
 - 线性求解器返回的状态原样传递；缩减矩阵奇异时返回 FEM_SINGULAR_MATRIX。
-- 不修改 src/main.c、include/model.h、include/solver.h、src/solver.c、Docker 文件或已有 Stage 1～4 测试。
+- 不修改 src/main.c、include/model.h、include/solver.h、src/solver.c 或已有 Stage 1～4 测试。为保持 Stage 5 后的 Docker 构建有效，允许仅在 Dockerfile 既有 demo 与 Stage 1 测试命令中把 src/solver.c 加入编译源列表；镜像阶段、测试执行和运行入口保持不变。
 
 ---
 
@@ -30,6 +30,7 @@
 | include/fem.h | 声明 Stage 5 公共接口 |
 | src/fem.c | 校验 DOF 集合、提取 Kff/Ff、调用求解器、回填位移 |
 | tests/test_stage5.c | Stage 5 契约、成功路径、失败路径和输入保护测试 |
+| Dockerfile | 保持既有 demo 与 Stage 1 测试命令可链接 Stage 5 的 solver 依赖 |
 | docs/superpowers/specs/2026-08-10-dof-reduction-design.md | 已批准设计契约 |
 | docs/superpowers/plans/2026-08-10-dof-reduction.md | 本实施计划及实际验收记录 |
 
@@ -343,15 +344,26 @@ git commit -m "docs: record stage 5 verification"
 
 预期：Worktree 干净，提交历史包含契约测试、实现和验证记录三个 Stage 5 变更提交。
 
+## 最终审查修复波次
+
+用户已批准扩大本波次范围，以修复 Docker 链接输入并同步设计/计划边界。
+公共签名、Stage 4 数值算法、固定容量策略和现有正确行为保持不变。
+
+- [x] 在 `tests/test_stage5.c` 中增加奇异与非有限失败路径的四类输入逐字节快照、Stage 4 `FEM_INVALID_ARGUMENT` 透传、负自由/约束 DOF 和 `constrained_count > MAX_DOF` 覆盖；测试使用真实 `src/solver.c`，不使用 mock。
+- [x] 通过临时故障注入分别取得状态透传、两条输入不变性和三个边界分支的 RED；恢复生产实现后 Stage 5 GREEN 的编译/运行退出码均为 0。
+- [x] 在 Dockerfile 两条既有 GCC 命令中加入 `src/solver.c`；未改变 Docker 运行语义。
+- [x] 修正 `include/fem.h` 注释归属，并为 `solve_constrained_system()` 增加准确接口说明。
+- [x] 更新设计状态、文件范围、验收范围和最终执行记录。
+
 ## 自审清单
 
 - 设计文档的所有目标均有 Task 1～3 对应步骤：接口、缩减、回代、清零、状态传递、输入不变性、固定容量和回归。
 - 契约测试先于实现运行，并预期在链接阶段因缺少实现而失败。
 - 计划中的函数名、参数顺序、状态码和 MAX_DOF 使用方式在所有任务中保持一致。
-- 没有引入动态内存、非零支座位移、反力计算、主程序修改或 Docker 代码变更。
+- 没有引入动态内存、非零支座位移、反力计算、主程序修改或 Docker 运行语义变更；Dockerfile 仅补齐 `src/solver.c` 链接输入。
 - 每个代码步骤都给出目标文件、具体 API、命令和预期结果，没有依赖未定义的后续接口。
 
-## 执行结果（2026-08-10）
+## 历史执行记录（2026-08-10，已由文末最终执行结果取代）
 
 - [x] Task 3 Step 1: 使用 `C:\\msys64\\ucrt64\\bin\\gcc.exe` 执行计划中的完整 PowerShell 回归脚本，结果退出码为 0。临时可执行文件位于 `$temp` （`Join-Path $env:TEMP 'c_fe_stage5_verify'`）并在脚本结束时删除。
   - `tests\\test_stage1.c`: `Stage 1 tests passed.`
@@ -440,3 +452,85 @@ Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 此范围中的代码/测试变更仅包括 `include/fem.h`、`src/fem.c` 和 `tests/test_stage5.c`；`docs/superpowers/plans/2026-08-10-dof-reduction.md` 是验证记录文档，不属于代码或测试范围。`af9da69` （`docs: record stage 5 verification`）是本次审查修正前的验证提交，已在本执行结果中明确记录。
 
 审查修正提交：`4a3ac1d` （`docs: correct stage 5 verification record`）。此提交包含可直接执行的命令记录、逐项实际退出码以及细分的代码/测试与文档范围说明。
+
+## 最终执行结果（2026-08-10）
+
+权威验收基线为 `5b5fc6b..8ab9157`，编译器为
+`C:\msys64\ucrt64\bin\gcc.exe`（GCC 16.1.0）。所有可执行文件均写入
+`Join-Path $env:TEMP 'c_fe_stage5_final_verify'`，执行后目录已删除
+（`temp_removed=True`）。
+
+### 回归、示例和链接验证
+
+所有编译均使用 `-std=c11 -Wall -Wextra -pedantic`、`-Iinclude` 和 `-lm`。
+
+- [x] Stage 1：`tests\test_stage1.c src\fem.c src\solver.c`，
+  `stage1_compile_exit=0`；输出 `Stage 1 tests passed.`，
+  `stage1_run_exit=0`。
+- [x] Stage 2：`tests\test_stage2.c src\fem.c src\solver.c`，
+  `stage2_compile_exit=0`；输出 `Stage 2 tests passed.`，
+  `stage2_run_exit=0`。
+- [x] Stage 3：`tests\test_stage3.c src\fem.c src\solver.c`，
+  `stage3_compile_exit=0`；输出 `Stage 3 tests passed.`，
+  `stage3_run_exit=0`。
+- [x] Stage 4：`tests\test_stage4.c src\fem.c src\solver.c`，
+  `stage4_compile_exit=0`；输出 `Stage 4 tests passed.`，
+  `stage4_run_exit=0`。
+- [x] Stage 5：`tests\test_stage5.c src\fem.c src\solver.c`，
+  `stage5_compile_exit=0`；输出 `Stage 5 contract tests passed.`，
+  `stage5_run_exit=0`。
+- [x] demo：`src\main.c src\fem.c src\solver.c`，
+  `demo_compile_exit=0`；输出包含 `Stage 1: single 2D truss element`、
+  `Length = 943.398113205660 mm`、`c = 0.529998940003`、
+  `s = 0.847998304005`，`demo_run_exit=0`。
+- [x] Dockerfile 等价 demo 链接命令：
+  `src\main.c src\fem.c src\solver.c`，
+  `docker_equiv_demo_compile_exit=0`。
+- [x] Dockerfile 等价 Stage 1 链接命令：
+  `tests\test_stage1.c src\fem.c src\solver.c`，
+  `docker_equiv_stage1_compile_exit=0`。
+- [x] 回归证明：省略 `src/solver.c` 的旧等价命令均因
+  `undefined reference to solve_linear_system` 失败，
+  `old_demo_link_exit=1`、`old_stage1_link_exit=1`。
+- [x] `git diff --check` 无输出，`git_diff_check_exit=0`。
+
+### 完整分支范围与提交链
+
+`git diff --name-status 5b5fc6b..8ab9157` 退出码 0：
+
+~~~text
+M  Dockerfile
+A  docs/superpowers/plans/2026-08-10-dof-reduction.md
+A  docs/superpowers/specs/2026-08-10-dof-reduction-design.md
+M  include/fem.h
+M  src/fem.c
+A  tests/test_stage5.c
+~~~
+
+代码/集成范围为 `Dockerfile`、`include/fem.h`、`src/fem.c`；测试范围为
+`tests/test_stage5.c`；设计与验证文档范围为两份
+`docs/superpowers/...` 文档。完整提交链为：
+
+~~~text
+67db1aa docs: define stage 5 dof reduction and displacement recovery
+caca61a docs: plan stage 5 dof reduction and displacement recovery
+9e7da5b test: define stage 5 dof reduction contract
+5565e78 test: cover constrained dof validation gaps
+6983464 feat: reduce constrained system and recover displacements
+6d6a612 test: correct stage 5 fixture construction
+af9da69 docs: record stage 5 verification
+4a3ac1d docs: correct stage 5 verification record
+af1bd07 docs: record verification correction commit
+f83ffcc test: cover stage 5 failure contracts
+8ab9157 fix: link solver in Docker builds
+~~~
+
+本次修复验证的代码/测试提交为 `f83ffcc` 和 `8ab9157`。
+
+### 限制与既有警告
+
+- Docker CLI 不可用（`docker_cli_available=false`），因此 Docker 引擎/镜像验收
+  **未执行**，不宣称 Docker 验收通过；仅完成两条等价 GCC 链接验证。
+- 编译保留 14 条既有 `-Wmissing-field-initializers` 警告：
+  `tests/test_stage1.c` 6 条、`tests/test_stage2.c` 6 条、`src/main.c` 2 条，
+  均指向既有 `Node.fx` 未显式初始化；Stage 3～5 无警告。

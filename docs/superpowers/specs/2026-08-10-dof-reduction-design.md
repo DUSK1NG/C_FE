@@ -1,7 +1,7 @@
 # Stage 5：自由度缩减与位移回代设计
 
 - 设计日期：2026-08-10
-- 设计状态：已获用户确认，待实现
+- 设计状态：已实现、已验证
 - 工作分支：`stage5-dof-reduction`
 - 基线：已合并 Stage 4 的 `stage3-loads-constraints`
 
@@ -23,7 +23,9 @@ Stage 5 在 Stage 3 的原始总体刚度矩阵、原始荷载向量和自由度
 - 修改 Stage 4 线性求解器的接口或数值算法；
 - 支持非零支座位移；当前 `fix_x` 和 `fix_y` 只表示零位移约束；
 - 计算支座反力、应变、应力或单元后处理结果；
-- 修改文件输入、动态内存策略、主程序流程或 Docker 配置；
+- 修改文件输入、动态内存策略或主程序流程；Docker 仅允许把
+  `src/solver.c` 加入既有 demo 与 Stage 1 测试的编译源列表，以保持
+  Stage 5 后的链接有效，不改变镜像阶段、测试执行或运行入口；
 - 要求自由度集合覆盖 `0..MAX_DOF` 的全部槽位。Stage 3 只对实际节点自由度输出集合，固定容量尾部可以不参与求解。
 
 ## 2. 设计方案
@@ -90,9 +92,12 @@ constrained_dofs[] ──> 合法性/交集校验 ──────────
 | `include/fem.h` | 声明 `solve_constrained_system()` |
 | `src/fem.c` | 增加自由度集合校验、`Kff`/`Ff` 提取、求解调用和位移回代 |
 | `tests/test_stage5.c` | 覆盖 Stage 5 公共接口契约和回归路径 |
+| `Dockerfile` | 在既有 demo 与 Stage 1 测试链接命令中加入 `src/solver.c` |
 | `docs/superpowers/plans/2026-08-10-dof-reduction.md` | 记录实现步骤与验收结果 |
 
-不修改 `include/model.h`、`include/solver.h`、`src/solver.c`、`src/main.c`、Docker 文件和既有 Stage 1～4 测试文件。
+不修改 `include/model.h`、`include/solver.h`、`src/solver.c`、`src/main.c`
+和既有 Stage 1～4 测试文件。Dockerfile 的变更严格限于上述两条命令的
+编译源列表。
 
 ## 6. 验收模型与测试
 
@@ -104,8 +109,15 @@ constrained_dofs[] ──> 合法性/交集校验 ──────────
 - 缺少指针、负计数、越界自由度和重复自由度返回 `FEM_INVALID_ARGUMENT`，并清空输出；
 - 计数或总计数超过 `MAX_DOF` 返回 `FEM_CAPACITY_EXCEEDED`，并清空输出；
 - 缩减后的矩阵奇异时返回 `FEM_SINGULAR_MATRIX`，并清空输出；
-- 原始矩阵、荷载向量和两个自由度数组在成功与失败后均保持不变；
+- 缩减后的载荷含 `NAN` 等非有限值时，原样透传 Stage 4 的
+  `FEM_INVALID_ARGUMENT`，并清空输出；
+- 原始矩阵、荷载向量和两个自由度数组在成功、奇异失败与非有限失败后
+  均逐字节保持不变；
+- 负自由 DOF、负约束 DOF 返回 `FEM_INVALID_ARGUMENT`；
+  `constrained_count > MAX_DOF` 返回 `FEM_CAPACITY_EXCEEDED`；
 - Stage 1、Stage 2、Stage 3、Stage 4 回归测试继续通过，Stage 1 示例继续通过；
+- Dockerfile 两条 GCC 命令的等价本地链接验证通过；Docker 引擎不可用时
+  仅记录为未执行，不宣称 Docker 镜像验收通过；
 - `git diff --check` 通过，测试临时可执行文件不进入仓库。
 
 完整的测试命令、实际输出和环境限制写入实现计划的执行结果部分；未运行 Docker 时不宣称 Docker 验收通过。
