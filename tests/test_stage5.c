@@ -246,6 +246,15 @@ static void test_out_of_range_dof_clears_solution(void)
                                            constrained_dofs, 1, displacement),
                   FEM_INVALID_ARGUMENT);
     expect_zero_vector("out of range solution", displacement, MAX_DOF);
+    free_dofs[0] = 0;
+    constrained_dofs[0] = MAX_DOF;
+    fill_vector(displacement, 77.0);
+    expect_status("out of range constrained DOF",
+                  solve_constrained_system(CONST_MATRIX(matrix), force, free_dofs, 1,
+                                           constrained_dofs, 1, displacement),
+                  FEM_INVALID_ARGUMENT);
+    expect_zero_vector("out of range constrained solution", displacement,
+                       MAX_DOF);
 }
 
 static void test_duplicate_or_overlapping_dof_clears_solution(void)
@@ -256,6 +265,7 @@ static void test_duplicate_or_overlapping_dof_clears_solution(void)
     int duplicate[MAX_DOF] = {0, 0};
     int free_dofs[MAX_DOF] = {0};
     int constrained_dofs[MAX_DOF] = {0};
+    int duplicate_constrained[MAX_DOF] = {0, 0};
 
     fill_matrix(matrix, 0.0);
     fill_vector(force, 0.0);
@@ -271,6 +281,12 @@ static void test_duplicate_or_overlapping_dof_clears_solution(void)
                                            constrained_dofs, 1, displacement),
                   FEM_INVALID_ARGUMENT);
     expect_zero_vector("overlapping solution", displacement, MAX_DOF);
+    fill_vector(displacement, 77.0);
+    expect_status("duplicate constrained DOF",
+                  solve_constrained_system(CONST_MATRIX(matrix), force, free_dofs, 0,
+                                           duplicate_constrained, 2, displacement),
+                  FEM_INVALID_ARGUMENT);
+    expect_zero_vector("duplicate constrained solution", displacement, MAX_DOF);
 }
 
 static void test_count_over_capacity_clears_solution(void)
