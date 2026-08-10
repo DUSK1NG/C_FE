@@ -350,3 +350,17 @@ git commit -m "docs: record stage 5 verification"
 - 计划中的函数名、参数顺序、状态码和 MAX_DOF 使用方式在所有任务中保持一致。
 - 没有引入动态内存、非零支座位移、反力计算、主程序修改或 Docker 代码变更。
 - 每个代码步骤都给出目标文件、具体 API、命令和预期结果，没有依赖未定义的后续接口。
+
+## 执行结果（2026-08-10）
+
+- [x] Task 3 Step 1: 使用 `C:\\msys64\\ucrt64\\bin\\gcc.exe` 执行计划中的完整 PowerShell 回归脚本，结果退出码为 0。临时可执行文件创建于 `%TEMP%\\c_fe_stage5_verify` 并在脚本结束时删除。
+  - `tests\\test_stage1.c`: `Stage 1 tests passed.`
+  - `tests\\test_stage2.c`: `Stage 2 tests passed.`
+  - `tests\\test_stage3.c`: `Stage 3 tests passed.`
+  - `tests\\test_stage4.c`: `Stage 4 tests passed.`
+  - `tests\\test_stage5.c`: `Stage 5 contract tests passed.`
+  - `src\\main.c` 示例已运行：输出 `Stage 1: single 2D truss element`、`Length = 943.398113205660 mm`、`c = 0.529998940003` 和 `s = 0.847998304005`。
+- [x] Task 3 Step 2: `git diff --check` 退出码 0；`rg --files src include tests` 退出码 0；`git status --short` 在记录前为空，未发现临时 `.exe` 产物。Git 命令以临时 `safe.directory=C:/Users/jking1/Desktop/my-project/c_FE-stage5-dof-reduction` 设置执行，未更改全局 Git 配置。
+- [x] 范围检查: `git diff --name-status caca61a..HEAD` 退出码 0，仅列出 `include/fem.h`、`src/fem.c` 和 `tests/test_stage5.c`。提交链为 `9e7da5b test: define stage 5 dof reduction contract`、`6983464 feat: reduce constrained system and recover displacements` 和 `6d6a612 test: correct stage 5 fixture construction`。
+- [x] 警告记录: 编译仍有 14 条 `-Wmissing-field-initializers` 警告，均指向既有 `Node.fx` 未显式初始化：`tests/test_stage1.c` 6 条、`tests/test_stage2.c` 6 条、`src/main.c` 2 条。它们未导致编译或运行失败。
+- Docker 验收未执行: `docker version` 无法识别 `docker` 命令（该环境未提供 Docker CLI/引擎）。本记录不宣称 Docker 验收通过。
