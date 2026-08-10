@@ -528,3 +528,37 @@ Expected result: clean worktree with three Stage 3 commits: contract/tests, impl
 - Type consistency: the Node fields and both function signatures are identical in Task 1, Task 2, and the design specification.
 - Empty-item scan: every step names its files, command, expected result, or exact code; no unfinished placeholder instruction or unspecified edge-case instruction is required.
 - Branch safety: all implementation work is performed in stage3-loads-constraints; the original stage2-global-stiffness worktree remains unchanged.
+
+---
+
+## 执行结果
+
+**日期：** 2026-08-10
+**分支：** `stage3-loads-constraints`
+**验证基线：** `5d6406c feat: map stage 3 loads and constraints`
+**此前提交：** `d8558db test: define stage 3 loads and constraints contract`; `ac6855e test: close stage 3 contract coverage gaps`; `5d6406c feat: map stage 3 loads and constraints`.
+
+- [x] Task 3 / Step 1 — 在本进程 PATH 前置 `C:\msys64\ucrt64\bin` 后，使用 `C:\msys64\ucrt64\bin\gcc.exe`（C11，`-Wall -Wextra -pedantic`，`-lm`）分别编译并执行 `tests\test_stage3.c`、`tests\test_stage2.c`、`tests\test_stage1.c`，并编译运行 `src\main.c` 演示；所有命令与程序退出码均为 0。
+  - 输出：`Stage 3 tests passed.`
+  - 输出：`Stage 2 tests passed.`
+  - 输出：`Stage 1 tests passed.`
+  - 演示保持为 Stage 1 单杆件输出：`Length = 943.398113205660 mm`、`c = 0.529998940003`、`s = 0.847998304005`，并输出原 4x4 单元刚度矩阵。
+  - 生成物路径为 `%TEMP%\c_fe_stage3_verify`；验证结束后已递归删除（`Test-Path` 为 `False`）。
+- [x] Task 3 / Step 2 — `git diff --check` 退出码 0，且没有输出空白错误。
+  - `rg --files src include tests` 仅列出 `src\fem.c`、`src\main.c`、三个头文件和 `tests\test_stage1.c`、`tests\test_stage2.c`、`tests\test_stage3.c`。
+  - `rg -n "solver\.c|matrix\.c|io\.c|postprocess\.c|gaussian|reduce|displacement" src include tests` 退出码 1（无匹配）；这是 ripgrep 对“未发现禁止项”的预期状态。
+  - `git status --short` 在记录前无输出；没有生成物进入工作区。
+- [x] Task 3 / Step 3 — 已写入本节，包含日期、编译器命令族、真实输出、提交和环境限制。
+- [x] Task 3 / Step 4 — 验证记录与 Task 3 报告已纳入提交 `docs: record stage 3 loads and constraints verification`。
+
+### 环境限制与关注项
+
+- UCRT64 GCC 在 Stage 2、Stage 1 和 Stage 1 演示的既有三字段 `Node` 聚合初始化处发出 14 个 `-Wmissing-field-initializers` 警告；四项新增字段会被 C 规则零初始化。编译和所有运行结果仍为退出码 0。遵循范围限制，未修改既有源码或测试来消除这些警告。
+- 本任务未运行 Docker 检查；因此未声明 Docker 验收。
+
+### 自审
+
+- [x] 规格覆盖由 Task 1/2 的 Node 字段、两项公共函数、状态码、失败清零、DOF 顺序、固定容量、NaN/Inf 拒绝与测试模型覆盖；本任务新增全量回归证据。
+- [x] `include/model.h`、`include/fem.h`、`tests/test_stage3.c` 和 `src/fem.c` 已由 Stage 3 测试及 Stage 1/2 回归共同验证；未发现接口不一致。
+- [x] 计划无待补充的验证步骤；Task 3 的每个步骤均已记录真实命令或实际结果。
+- [x] 当前验证在 `stage3-loads-constraints` 上完成；未操作原 `stage2-global-stiffness` 工作区。
