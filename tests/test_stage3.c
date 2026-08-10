@@ -77,9 +77,9 @@ static void expect_zero_dofs(int dofs[MAX_DOF])
 static void test_force_vector(void)
 {
     const Node nodes[3] = {
-        {1, 0.0,    0.0,   125.0,     0.0,     1, 1},
-        {2, 1000.0, 0.0,   0.0,       0.0,     0, 1},
-        {3, 500.0,  800.0, 0.0,  -10000.0,     0, 0}
+        {42,  0.0,    0.0,   125.0,     0.0,     1, 1},
+        {-7,  1000.0, 0.0,   0.0,       0.0,     0, 1},
+        {100, 500.0,  800.0, 0.0,  -10000.0,     0, 0}
     };
     static const double expected[6] = {
         125.0, 0.0, 0.0, 0.0, 0.0, -10000.0
@@ -103,9 +103,9 @@ static void test_force_vector(void)
 static void test_dof_sets(void)
 {
     const Node nodes[3] = {
-        {1, 0.0,    0.0, 0.0, 0.0, 1, 1},
-        {2, 1000.0, 0.0, 0.0, 0.0, 0, 1},
-        {3, 500.0,  800.0, 0.0, 0.0, 0, 0}
+        {42,  0.0,    0.0, 0.0, 0.0, 1, 1},
+        {-7,  1000.0, 0.0, 0.0, 0.0, 0, 1},
+        {100, 500.0,  800.0, 0.0, 0.0, 0, 0}
     };
     static const int expected_free[3] = {2, 4, 5};
     static const int expected_constrained[3] = {0, 1, 3};
@@ -144,7 +144,10 @@ static void test_dof_sets(void)
 
 static void test_invalid_constraint_clears_outputs(void)
 {
-    const Node nodes[1] = {{1, 0.0, 0.0, 0.0, 0.0, 2, 0}};
+    const Node nodes[2] = {
+        {42, 0.0, 0.0, 0.0, 0.0, 0, 0},
+        {-7, 1.0, 0.0, 0.0, 0.0, 2, 0}
+    };
     int free_dofs[MAX_DOF];
     int constrained_dofs[MAX_DOF];
     int free_count = 99;
@@ -153,7 +156,7 @@ static void test_invalid_constraint_clears_outputs(void)
     fill_int_array(free_dofs, MAX_DOF, 77);
     fill_int_array(constrained_dofs, MAX_DOF, 77);
     expect_status("invalid constraint",
-                  identify_dofs(nodes, 1,
+                  identify_dofs(nodes, 2,
                                 free_dofs, &free_count,
                                 constrained_dofs, &constrained_count),
                   FEM_INVALID_CONSTRAINT);
@@ -167,7 +170,10 @@ static void test_invalid_constraint_clears_outputs(void)
 
 static void test_invalid_fix_y_clears_outputs(void)
 {
-    const Node nodes[1] = {{1, 0.0, 0.0, 0.0, 0.0, 0, 2}};
+    const Node nodes[2] = {
+        {42, 0.0, 0.0, 0.0, 0.0, 0, 0},
+        {-7, 1.0, 0.0, 0.0, 0.0, 0, 2}
+    };
     int free_dofs[MAX_DOF];
     int constrained_dofs[MAX_DOF];
     int free_count = 99;
@@ -176,7 +182,7 @@ static void test_invalid_fix_y_clears_outputs(void)
     fill_int_array(free_dofs, MAX_DOF, 77);
     fill_int_array(constrained_dofs, MAX_DOF, 77);
     expect_status("invalid fix_y",
-                  identify_dofs(nodes, 1,
+                  identify_dofs(nodes, 2,
                                 free_dofs, &free_count,
                                 constrained_dofs, &constrained_count),
                   FEM_INVALID_CONSTRAINT);
@@ -190,7 +196,10 @@ static void test_invalid_fix_y_clears_outputs(void)
 
 static void test_negative_constraint_clears_outputs(void)
 {
-    const Node nodes[1] = {{1, 0.0, 0.0, 0.0, 0.0, -1, 0}};
+    const Node nodes[2] = {
+        {42, 0.0, 0.0, 0.0, 0.0, 0, 0},
+        {-7, 1.0, 0.0, 0.0, 0.0, -1, 0}
+    };
     int free_dofs[MAX_DOF];
     int constrained_dofs[MAX_DOF];
     int free_count = 99;
@@ -199,7 +208,7 @@ static void test_negative_constraint_clears_outputs(void)
     fill_int_array(free_dofs, MAX_DOF, 77);
     fill_int_array(constrained_dofs, MAX_DOF, 77);
     expect_status("negative constraint",
-                  identify_dofs(nodes, 1,
+                  identify_dofs(nodes, 2,
                                 free_dofs, &free_count,
                                 constrained_dofs, &constrained_count),
                   FEM_INVALID_CONSTRAINT);
@@ -213,24 +222,30 @@ static void test_negative_constraint_clears_outputs(void)
 
 static void test_nan_load_clears_vector(void)
 {
-    const Node nodes[1] = {{1, 0.0, 0.0, NAN, 0.0, 0, 0}};
+    const Node nodes[2] = {
+        {42, 0.0, 0.0, 125.0, 0.0, 0, 0},
+        {-7, 1.0, 0.0, NAN, 0.0, 0, 0}
+    };
     double force[MAX_DOF];
 
     fill_double_array(force, MAX_DOF, 77.0);
     expect_status("NaN load",
-                  build_force_vector(nodes, 1, force),
+                  build_force_vector(nodes, 2, force),
                   FEM_INVALID_LOAD);
     expect_zero_force(force);
 }
 
 static void test_infinity_load_clears_vector(void)
 {
-    const Node nodes[1] = {{1, 0.0, 0.0, 0.0, INFINITY, 0, 0}};
+    const Node nodes[2] = {
+        {42, 0.0, 0.0, 125.0, 0.0, 0, 0},
+        {-7, 1.0, 0.0, 0.0, INFINITY, 0, 0}
+    };
     double force[MAX_DOF];
 
     fill_double_array(force, MAX_DOF, 77.0);
     expect_status("infinity load",
-                  build_force_vector(nodes, 1, force),
+                  build_force_vector(nodes, 2, force),
                   FEM_INVALID_LOAD);
     expect_zero_force(force);
 }
