@@ -7,4 +7,7 @@
 /* 长度小于该值时认为单元为零长度。单位：mm。 */
 #define GEOMETRY_TOL 1.0e-12
 
+#define MAX_NODES 10
+#define MAX_DOF (2 * MAX_NODES)
+
 #endif
