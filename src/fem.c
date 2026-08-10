@@ -17,6 +17,24 @@ static void clear_global_matrix(double global_k[MAX_DOF][MAX_DOF])
     }
 }
 
+static void clear_force_vector(double force[MAX_DOF])
+{
+    int i;
+
+    for (i = 0; i < MAX_DOF; ++i) {
+        force[i] = 0.0;
+    }
+}
+
+static void clear_dof_array(int dofs[MAX_DOF])
+{
+    int i;
+
+    for (i = 0; i < MAX_DOF; ++i) {
+        dofs[i] = 0;
+    }
+}
+
 FemStatus calculate_element_geometry(const Node *node_i,
                                      const Node *node_j,
                                      Element *element)
@@ -172,6 +190,98 @@ FemStatus assemble_global_stiffness(const Node *nodes,
     return FEM_OK;
 }
 
+FemStatus build_force_vector(const Node *nodes,
+                             int node_count,
+                             double force[MAX_DOF])
+{
+    int i;
+
+    if (force != NULL) {
+        clear_force_vector(force);
+    }
+    if (nodes == NULL || force == NULL || node_count <= 0) {
+        return FEM_INVALID_ARGUMENT;
+    }
+    if (node_count > MAX_NODES) {
+        return FEM_CAPACITY_EXCEEDED;
+    }
+
+    for (i = 0; i < node_count; ++i) {
+        if (!isfinite(nodes[i].fx) || !isfinite(nodes[i].fy)) {
+            return FEM_INVALID_LOAD;
+        }
+    }
+
+    for (i = 0; i < node_count; ++i) {
+        force[2 * i] = nodes[i].fx;
+        force[2 * i + 1] = nodes[i].fy;
+    }
+
+    return FEM_OK;
+}
+
+FemStatus identify_dofs(const Node *nodes,
+                        int node_count,
+                        int free_dofs[MAX_DOF],
+                        int *free_count,
+                        int constrained_dofs[MAX_DOF],
+                        int *constrained_count)
+{
+    int i;
+    int dof;
+
+    if (free_dofs != NULL) {
+        clear_dof_array(free_dofs);
+    }
+    if (constrained_dofs != NULL) {
+        clear_dof_array(constrained_dofs);
+    }
+    if (free_count != NULL) {
+        *free_count = 0;
+    }
+    if (constrained_count != NULL) {
+        *constrained_count = 0;
+    }
+
+    if (nodes == NULL || free_dofs == NULL || free_count == NULL ||
+        constrained_dofs == NULL || constrained_count == NULL ||
+        node_count <= 0) {
+        return FEM_INVALID_ARGUMENT;
+    }
+    if (node_count > MAX_NODES) {
+        return FEM_CAPACITY_EXCEEDED;
+    }
+
+    for (i = 0; i < node_count; ++i) {
+        if ((nodes[i].fix_x != 0 && nodes[i].fix_x != 1) ||
+            (nodes[i].fix_y != 0 && nodes[i].fix_y != 1)) {
+            return FEM_INVALID_CONSTRAINT;
+        }
+    }
+
+    for (i = 0; i < node_count; ++i) {
+        dof = 2 * i;
+        if (nodes[i].fix_x == 0) {
+            free_dofs[*free_count] = dof;
+            *free_count += 1;
+        } else {
+            constrained_dofs[*constrained_count] = dof;
+            *constrained_count += 1;
+        }
+
+        dof += 1;
+        if (nodes[i].fix_y == 0) {
+            free_dofs[*free_count] = dof;
+            *free_count += 1;
+        } else {
+            constrained_dofs[*constrained_count] = dof;
+            *constrained_count += 1;
+        }
+    }
+
+    return FEM_OK;
+}
+
 const char *fem_status_message(FemStatus status)
 {
     switch (status) {
@@ -187,6 +297,10 @@ const char *fem_status_message(FemStatus status)
         return "invalid node index";
     case FEM_CAPACITY_EXCEEDED:
         return "model exceeds fixed node capacity";
+    case FEM_INVALID_CONSTRAINT:
+        return "constraint flags must be 0 or 1";
+    case FEM_INVALID_LOAD:
+        return "loads must be finite";
     default:
         return "unknown FEM status";
     }
