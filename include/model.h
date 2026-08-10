@@ -5,6 +5,11 @@ typedef struct {
     int id;
     double x;
     double y;
+
+    double fx;
+    double fy;
+    int fix_x;
+    int fix_y;
 } Node;
 
 typedef struct {

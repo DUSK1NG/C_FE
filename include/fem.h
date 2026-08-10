@@ -10,7 +10,9 @@ typedef enum {
     FEM_ZERO_LENGTH,
     FEM_INVALID_PROPERTY,
     FEM_INVALID_INDEX,
-    FEM_CAPACITY_EXCEEDED
+    FEM_CAPACITY_EXCEEDED,
+    FEM_INVALID_CONSTRAINT,
+    FEM_INVALID_LOAD
 } FemStatus;
 
 /* 计算单元长度和方向余弦。 */
@@ -28,6 +30,17 @@ FemStatus assemble_global_stiffness(const Node *nodes,
                                     Element *elements,
                                     int element_count,
                                     double global_k[MAX_DOF][MAX_DOF]);
+
+FemStatus build_force_vector(const Node *nodes,
+                             int node_count,
+                             double force[MAX_DOF]);
+
+FemStatus identify_dofs(const Node *nodes,
+                        int node_count,
+                        int free_dofs[MAX_DOF],
+                        int *free_count,
+                        int constrained_dofs[MAX_DOF],
+                        int *constrained_count);
 
 /* 将状态码转换为可读错误信息。 */
 const char *fem_status_message(FemStatus status);
