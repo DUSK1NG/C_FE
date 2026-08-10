@@ -538,6 +538,7 @@ Expected result: clean worktree with three Stage 3 commits: contract/tests, impl
 **验证基线：** `5d6406c feat: map stage 3 loads and constraints`
 **此前提交：** `d8558db test: define stage 3 loads and constraints contract`; `ac6855e test: close stage 3 contract coverage gaps`; `5d6406c feat: map stage 3 loads and constraints`.
 **本次验证提交（完整 ID）：** `f1ce6f9d9130366956bd7c209fddb4f41d7c728c`
+**本轮验证记录/范围修复提交（完整 ID）：** `dfc05a9bad48bc406e21032bd81c95360f175c29`
 
 - [x] Task 3 / Step 1 — 在本进程 PATH 前置 `C:\msys64\ucrt64\bin` 后，使用 `C:\msys64\ucrt64\bin\gcc.exe`（C11，`-Wall -Wextra -pedantic`，`-lm`）分别编译并执行 `tests\test_stage3.c`、`tests\test_stage2.c`、`tests\test_stage1.c`，并编译运行 `src\main.c` 演示；所有命令与程序退出码均为 0。
   - 输出：`Stage 3 tests passed.`
