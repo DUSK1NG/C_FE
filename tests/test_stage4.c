@@ -46,6 +46,15 @@ static void expect_zero_vector(const char *name,
     }
 }
 
+static void fill_vector(double values[MAX_DOF], double value)
+{
+    int i;
+
+    for (i = 0; i < MAX_DOF; ++i) {
+        values[i] = value;
+    }
+}
+
 static void expect_matrix_unchanged(
     const double *actual,
     const double *expected)
@@ -137,19 +146,34 @@ static void test_invalid_arguments(void)
     const double rhs[MAX_DOF] = {1.0};
     double solution[MAX_DOF];
 
+    fill_vector(solution, 77.0);
     expect_status("null matrix", solve_linear_system(NULL, rhs, 1, solution),
                   FEM_INVALID_ARGUMENT);
+    expect_zero_vector("null matrix solution", solution, MAX_DOF);
+
+    fill_vector(solution, 77.0);
     expect_status("null rhs", solve_linear_system(matrix, NULL, 1, solution),
                   FEM_INVALID_ARGUMENT);
+    expect_zero_vector("null rhs solution", solution, MAX_DOF);
+
     expect_status("null solution", solve_linear_system(matrix, rhs, 1, NULL),
                   FEM_INVALID_ARGUMENT);
+
+    fill_vector(solution, 77.0);
     expect_status("zero size", solve_linear_system(matrix, rhs, 0, solution),
                   FEM_INVALID_ARGUMENT);
+    expect_zero_vector("zero size solution", solution, MAX_DOF);
+
+    fill_vector(solution, 77.0);
     expect_status("negative size", solve_linear_system(matrix, rhs, -1, solution),
                   FEM_INVALID_ARGUMENT);
+    expect_zero_vector("negative size solution", solution, MAX_DOF);
+
+    fill_vector(solution, 77.0);
     expect_status("size over capacity",
                   solve_linear_system(matrix, rhs, MAX_DOF + 1, solution),
-                  FEM_INVALID_ARGUMENT);
+                  FEM_CAPACITY_EXCEEDED);
+    expect_zero_vector("size over capacity solution", solution, MAX_DOF);
 }
 
 static void test_nonfinite_input(void)
