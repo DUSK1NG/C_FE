@@ -298,15 +298,11 @@ static void test_validation_and_file_errors(void)
 
 static void emit_debug_fixture(void)
 {
-    double matrix[MAX_DOF][MAX_DOF] = {{0.0}};
-    double vector[MAX_DOF] = {0.0};
-
-    matrix[0][0] = 12.5;
-    matrix[0][1] = -3.25;
-    matrix[1][0] = 4.75;
-    matrix[1][1] = 8.0;
-    vector[0] = 6.5;
-    vector[1] = -1.25;
+    const double matrix[MAX_DOF][MAX_DOF] = {
+        {12.5, -3.25},
+        {4.75, 8.0}
+    };
+    const double vector[MAX_DOF] = {6.5, -1.25};
 
     print_debug_matrix("K_original", matrix, 2);
     print_debug_vector("F_original", vector, 2);
@@ -320,8 +316,14 @@ static void test_debug_contract(const char *executable_path)
     int length;
 
     remove(path);
+#ifdef _WIN32
+    length = snprintf(command, sizeof(command),
+                      "\"\"%s\" --emit-debug > \"%s\"\"",
+                      executable_path, path);
+#else
     length = snprintf(command, sizeof(command), "\"%s\" --emit-debug > \"%s\"",
                       executable_path, path);
+#endif
     assert(length > 0 && (size_t)length < sizeof(command));
     assert(system(command) == 0);
     assert(read_file(path, buffer, sizeof(buffer)) != 0);
