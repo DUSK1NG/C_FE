@@ -56,11 +56,11 @@ Call `write_results_markdown("stage9_results.md", &model, &results)` and assert 
 
 For each case, pre-fill output fixtures and assert a non-`FEM_OK` status from TXT, Markdown, and CSV: null path, null model, null results, zero/over-capacity node count, over-capacity element count, negative constrained count, duplicate constrained DOF, out-of-range constrained DOF, non-finite displacement, non-finite element result, and an output path whose parent does not exist. Assert no successful output is claimed.
 
-- [ ] **Step 5: Add Debug call coverage**
+- [ ] **Step 6: Add Debug call coverage**
 
 Call `print_debug_matrix("K_original", matrix, 2)` and `print_debug_vector("F_original", vector, 2)` with known values. The test exits successfully; its captured stdout is checked in the verification command for both names, dimensions, and values.
 
-- [ ] **Step 6: Run the contract test to verify RED**
+- [ ] **Step 7: Run the contract test to verify RED**
 
 Run:
 
@@ -70,7 +70,7 @@ gcc -std=c11 -Wall -Wextra -pedantic tests/test_stage9.c src/fem.c src/solver.c 
 
 Expected: compilation fails because `include/output.h` and the output implementation do not exist yet. Do not add production code in this task.
 
-- [ ] **Step 7: Commit the failing contract**
+- [ ] **Step 8: Commit the failing contract**
 
 ```text
 git add tests/test_stage9.c
