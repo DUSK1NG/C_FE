@@ -9,6 +9,7 @@
 #include "output.h"
 #include "postprocess.h"
 #include "reactions.h"
+#include "test_helpers.h"
 
 static int file_contains(const char *path, const char *needle)
 {
@@ -98,7 +99,7 @@ static void run_model_case(const char *path,
     assert(build_force_vector(model.nodes, model.node_count, force) == FEM_OK);
     assert(identify_dofs(model.nodes, model.node_count, free_dofs, &free_count,
                          constrained_dofs, &constrained_count) == FEM_OK);
-    assert(solve_constrained_system(global_k, force, free_dofs, free_count,
+    assert(solve_constrained_system(test_readonly_matrix(global_k), force, free_dofs, free_count,
                                     constrained_dofs, constrained_count,
                                     displacement) == FEM_OK);
 
@@ -114,7 +115,7 @@ static void run_model_case(const char *path,
                element_results[i].state == ELEMENT_COMPRESSION);
     }
 
-    assert(calculate_support_reactions(global_k, force, displacement,
+    assert(calculate_support_reactions(test_readonly_matrix(global_k), force, displacement,
                                        constrained_dofs, constrained_count,
                                        reactions) == FEM_OK);
     assert(check_global_equilibrium(force, reactions, 1.0e-6,
