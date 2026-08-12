@@ -13,7 +13,8 @@ typedef enum {
     FEM_CAPACITY_EXCEEDED,
     FEM_INVALID_CONSTRAINT,
     FEM_INVALID_LOAD,
-    FEM_SINGULAR_MATRIX /* matrix is singular or ill-conditioned */
+    FEM_SINGULAR_MATRIX, /* matrix is singular or ill-conditioned */
+    FEM_EQUILIBRIUM_ERROR
 } FemStatus;
 
 /* 计算单元长度和方向余弦。 */

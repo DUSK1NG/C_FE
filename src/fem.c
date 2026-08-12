@@ -394,6 +394,8 @@ const char *fem_status_message(FemStatus status)
         return "loads must be finite";
     case FEM_SINGULAR_MATRIX:
         return "matrix is singular or ill-conditioned";
+    case FEM_EQUILIBRIUM_ERROR:
+        return "global equilibrium check failed";
     default:
         return "unknown FEM status";
     }
