@@ -39,6 +39,17 @@ RUN gcc -std=c11 -Wall -Wextra -pedantic \
 
 RUN ./test_stage8
 
+RUN gcc -std=c11 -Wall -Wextra -pedantic \
+        tests/test_stage9.c src/fem.c src/solver.c src/reactions.c \
+        src/postprocess.c src/io.c src/output.c \
+        -Iinclude -o test_stage9 -lm
+
+RUN ./test_stage9 > stage9.out && \
+    ./test_stage9 --emit-debug >> stage9.out && \
+    grep -F "Stage 9 results output contract tests passed." stage9.out && \
+    grep -F "K_original" stage9.out && \
+    grep -F "F_original" stage9.out
+
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
