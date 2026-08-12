@@ -17,6 +17,13 @@ static void clear_results(FemResults *results)
     }
 }
 
+static void clear_element_results(ElementResult element_results[MAX_ELEMENTS])
+{
+    if (element_results != NULL) {
+        memset(element_results, 0, sizeof(ElementResult) * MAX_ELEMENTS);
+    }
+}
+
 static FemStatus validate_model_counts(const FemModel *model)
 {
     if (model->node_count <= 0 || model->element_count <= 0) {
@@ -59,6 +66,7 @@ FemStatus run_fem_analysis(const FemModel *model, FemResults *results)
     }
 
     working_model = *model;
+    clear_element_results(element_results);
 
     status = assemble_global_stiffness(working_model.nodes,
                                        working_model.node_count,

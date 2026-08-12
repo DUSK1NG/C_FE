@@ -50,6 +50,15 @@ static void run_case(const char *path, int nodes, int elements)
     for (i = 0; i < model.element_count; ++i) {
         assert(isfinite(results.element_results[i].axial_force));
     }
+    if (model.element_count < MAX_ELEMENTS) {
+        for (i = model.element_count; i < MAX_ELEMENTS; ++i) {
+            assert(results.element_results[i].elongation == 0.0);
+            assert(results.element_results[i].strain == 0.0);
+            assert(results.element_results[i].stress == 0.0);
+            assert(results.element_results[i].axial_force == 0.0);
+            assert(results.element_results[i].state == ELEMENT_NEUTRAL);
+        }
+    }
 }
 
 static void run_failure_cases(void)
