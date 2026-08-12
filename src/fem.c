@@ -396,6 +396,8 @@ const char *fem_status_message(FemStatus status)
         return "matrix is singular or ill-conditioned";
     case FEM_EQUILIBRIUM_ERROR:
         return "global equilibrium check failed";
+    case FEM_INPUT_ERROR:
+        return "invalid model input";
     default:
         return "unknown FEM status";
     }
