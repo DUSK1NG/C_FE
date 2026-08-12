@@ -235,6 +235,38 @@ static void test_one_axis_reaction_outputs(void)
     assert(remove(csv_path) == 0);
 }
 
+static void test_y_axis_reaction_outputs(void)
+{
+    FemModel model;
+    FemResults results;
+    char buffer[8192];
+    const char *txt_path = "stage9_y_axis.txt";
+    const char *markdown_path = "stage9_y_axis.md";
+    const char *csv_path = "stage9_y_axis.csv";
+
+    build_fixture(&model, &results);
+    results.constrained_count = 1;
+    results.constrained_dofs[0] = 1;
+
+    assert(write_results_txt(txt_path, &model, &results) == FEM_OK);
+    assert(read_file(txt_path, buffer, sizeof(buffer)) != 0);
+    assert(strstr(buffer, "10 0 -6.25\n") != NULL);
+    assert(strstr(buffer, "10 12.5 -6.25\n") == NULL);
+    assert(remove(txt_path) == 0);
+
+    assert(write_results_markdown(markdown_path, &model, &results) == FEM_OK);
+    assert(read_file(markdown_path, buffer, sizeof(buffer)) != 0);
+    assert(strstr(buffer, "| 10 | 0 | -6.25 |\n") != NULL);
+    assert(strstr(buffer, "| 10 | 12.5 | -6.25 |\n") == NULL);
+    assert(remove(markdown_path) == 0);
+
+    assert(write_results_csv(csv_path, &model, &results) == FEM_OK);
+    assert(read_file(csv_path, buffer, sizeof(buffer)) != 0);
+    assert(strstr(buffer, "REACTION,10,,,,,,,,0,-6.25,,\n") != NULL);
+    assert(strstr(buffer, "REACTION,10,,,,,,,,12.5,-6.25,,\n") == NULL);
+    assert(remove(csv_path) == 0);
+}
+
 static void assert_all_writers_reject(const char *path,
                                       const FemModel *model,
                                       const FemResults *results)
@@ -441,6 +473,7 @@ int main(int argc, char **argv)
     test_csv_contract();
     test_element_state_strings();
     test_one_axis_reaction_outputs();
+    test_y_axis_reaction_outputs();
     test_validation_and_file_errors();
     test_write_failures();
     test_debug_contract(argv[0]);
