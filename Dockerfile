@@ -33,6 +33,12 @@ RUN gcc -std=c11 -Wall -Wextra -pedantic \
 
 RUN ./test_stage7
 
+RUN gcc -std=c11 -Wall -Wextra -pedantic \
+        tests/test_stage8.c src/fem.c src/solver.c src/reactions.c src/io.c \
+        -Iinclude -o test_stage8 -lm
+
+RUN ./test_stage8
+
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
