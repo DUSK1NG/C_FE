@@ -22,6 +22,11 @@ RUN gcc -std=c11 -Wall -Wextra -pedantic \
 
 RUN ./test_stage1
 
+RUN gcc -std=c11 -Wall -Wextra -pedantic \
+        tests/test_stage6.c src/postprocess.c -Iinclude -o test_stage6 -lm
+
+RUN ./test_stage6
+
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
