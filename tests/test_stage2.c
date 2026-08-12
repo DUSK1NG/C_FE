@@ -180,7 +180,7 @@ static void test_status_messages(void)
     }
 
     if (strcmp(fem_status_message(FEM_CAPACITY_EXCEEDED),
-               "model exceeds fixed node capacity") != 0) {
+               "model exceeds fixed capacity") != 0) {
         fprintf(stderr, "FAIL: FEM_CAPACITY_EXCEEDED status message\n");
         exit(EXIT_FAILURE);
     }

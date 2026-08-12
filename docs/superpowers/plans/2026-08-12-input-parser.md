@@ -279,4 +279,3 @@ git commit -m "test: verify stage 8 input parser"
 - 非法语法、引用、容量、数值和几何输入被拒绝且输出清空。
 - Stage1–8 和 Demo 本地通过，Docker Stage8 测试通过。
 - 静态检查通过，分支独立且工作区干净。
-

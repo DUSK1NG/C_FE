@@ -126,6 +126,49 @@ static void write_long_prefix_model_file(const char *path)
     ASSERT_TRUE("close long-prefix model file", fclose(file) == 0);
 }
 
+static void write_model_with_unterminated_ignored_line(const char *path,
+                                                       int line_length,
+                                                       int is_comment)
+{
+    static const char valid_model[] =
+        "NODES 2\n"
+        "1 0 0\n"
+        "2 1 0\n"
+        "ELEMENTS 1\n"
+        "1 1 2 1 1\n"
+        "LOADS 0\n"
+        "CONSTRAINTS 0\n";
+    FILE *file = fopen(path, "w");
+    int i = 0;
+
+    ASSERT_TRUE("open unterminated ignored-line model", file != NULL);
+    ASSERT_TRUE("write model before unterminated ignored line",
+                fputs(valid_model, file) >= 0);
+    if (is_comment) {
+        ASSERT_TRUE("start unterminated comment line", fputc('#', file) != EOF);
+        i = 1;
+    }
+    for (; i < line_length; ++i) {
+        ASSERT_TRUE("write unterminated ignored line",
+                    fputc(is_comment ? 'x' : ' ', file) != EOF);
+    }
+    ASSERT_TRUE("close unterminated ignored-line model", fclose(file) == 0);
+}
+
+static void assert_unterminated_ignored_line_accepted(const char *name,
+                                                      int line_length,
+                                                      int is_comment)
+{
+    const char *path = "stage8_unterminated_ignored.model";
+    FemModel model;
+
+    write_model_with_unterminated_ignored_line(path, line_length, is_comment);
+    ASSERT_STATUS(name, read_model_file(path, &model), FEM_OK);
+    ASSERT_TRUE(name, model.node_count == 2);
+    ASSERT_TRUE(name, model.element_count == 1);
+    ASSERT_TRUE("remove unterminated ignored-line model", remove(path) == 0);
+}
+
 static void test_reference_model(void)
 {
     const Node expected_nodes[3] = {
@@ -327,6 +370,18 @@ static void test_long_blank_and_comment_lines(void)
     ASSERT_TRUE("remove long-prefix model", remove(path) == 0);
 }
 
+static void test_unterminated_ignored_lines_at_buffer_boundaries(void)
+{
+    assert_unterminated_ignored_line_accepted(
+        "511-byte unterminated blank line", 511, 0);
+    assert_unterminated_ignored_line_accepted(
+        "1022-byte unterminated blank line", 1022, 0);
+    assert_unterminated_ignored_line_accepted(
+        "511-byte unterminated comment line", 511, 1);
+    assert_unterminated_ignored_line_accepted(
+        "1022-byte unterminated comment line", 1022, 1);
+}
+
 static void test_out_of_range_integer_tokens(void)
 {
     assert_invalid_content("out-of-range section count",
@@ -363,24 +418,38 @@ static void test_missing_file_clears_model(void)
     assert_model_cleared("missing model file output", &model);
 }
 
-static void test_input_error_status_message(void)
+static void test_status_messages(void)
 {
+    const char *capacity_message = fem_status_message(FEM_CAPACITY_EXCEEDED);
+
     ASSERT_TRUE("input error status message",
                 strcmp(fem_status_message(FEM_INPUT_ERROR),
                        "invalid model input") == 0);
+    ASSERT_TRUE("capacity status message is generic",
+                strstr(capacity_message, "capacity") != NULL &&
+                strstr(capacity_message, "node") == NULL &&
+                strstr(capacity_message, "element") == NULL);
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    if (argc == 2 && strcmp(argv[1], "unterminated-boundaries") == 0) {
+        test_unterminated_ignored_lines_at_buffer_boundaries();
+        printf("Stage 8 unterminated-line boundary regression tests passed.\n");
+        return EXIT_SUCCESS;
+    }
+    ASSERT_TRUE("no unsupported Stage 8 test selector", argc == 1);
+
     test_reference_model();
     test_noncontiguous_user_ids();
     test_reference_model_end_to_end();
     test_invalid_inputs();
     test_long_blank_and_comment_lines();
+    test_status_messages();
+    test_unterminated_ignored_lines_at_buffer_boundaries();
     test_out_of_range_integer_tokens();
     test_nonfinite_geometry_is_input_error();
     test_missing_file_clears_model();
-    test_input_error_status_message();
 
     printf("Stage 8 input parser contract tests passed.\n");
     return EXIT_SUCCESS;

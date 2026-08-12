@@ -61,7 +61,7 @@ static int consume_long_blank_or_comment(FILE *file,
             return 1;
         }
         if (fgets(line, LINE_BUFFER_SIZE, file) == NULL) {
-            return 0;
+            return feof(file) && !ferror(file);
         }
     }
 }

@@ -387,7 +387,7 @@ const char *fem_status_message(FemStatus status)
     case FEM_INVALID_INDEX:
         return "invalid node index";
     case FEM_CAPACITY_EXCEEDED:
-        return "model exceeds fixed node capacity";
+        return "model exceeds fixed capacity";
     case FEM_INVALID_CONSTRAINT:
         return "constraint flags must be 0 or 1";
     case FEM_INVALID_LOAD:
