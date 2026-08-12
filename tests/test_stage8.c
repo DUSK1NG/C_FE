@@ -42,20 +42,38 @@
 
 static void assert_model_cleared(const char *name, const FemModel *model)
 {
-    FemModel cleared = {0};
+    int i;
 
     ASSERT_TRUE(name, model->node_count == 0);
     ASSERT_TRUE(name, model->element_count == 0);
-    ASSERT_TRUE(name, memcmp(model, &cleared, sizeof(cleared)) == 0);
+    for (i = 0; i < MAX_NODES; ++i) {
+        ASSERT_TRUE(name, model->nodes[i].id == 0);
+        ASSERT_NEAR(name, model->nodes[i].x, 0.0, 0.0);
+        ASSERT_NEAR(name, model->nodes[i].y, 0.0, 0.0);
+        ASSERT_NEAR(name, model->nodes[i].fx, 0.0, 0.0);
+        ASSERT_NEAR(name, model->nodes[i].fy, 0.0, 0.0);
+        ASSERT_TRUE(name, model->nodes[i].fix_x == 0);
+        ASSERT_TRUE(name, model->nodes[i].fix_y == 0);
+    }
+    for (i = 0; i < MAX_ELEMENTS; ++i) {
+        ASSERT_TRUE(name, model->elements[i].id == 0);
+        ASSERT_TRUE(name, model->elements[i].node1 == 0);
+        ASSERT_TRUE(name, model->elements[i].node2 == 0);
+        ASSERT_NEAR(name, model->elements[i].E, 0.0, 0.0);
+        ASSERT_NEAR(name, model->elements[i].A, 0.0, 0.0);
+        ASSERT_NEAR(name, model->elements[i].length, 0.0, 0.0);
+        ASSERT_NEAR(name, model->elements[i].c, 0.0, 0.0);
+        ASSERT_NEAR(name, model->elements[i].s, 0.0, 0.0);
+    }
 }
 
-static void write_invalid_file(const char *content)
+static void write_model_file(const char *path, const char *content)
 {
-    FILE *file = fopen(INVALID_MODEL_PATH, "w");
+    FILE *file = fopen(path, "w");
 
-    ASSERT_TRUE("open invalid model file", file != NULL);
-    ASSERT_TRUE("write invalid model file", fputs(content, file) >= 0);
-    ASSERT_TRUE("close invalid model file", fclose(file) == 0);
+    ASSERT_TRUE("open model file", file != NULL);
+    ASSERT_TRUE("write model file", fputs(content, file) >= 0);
+    ASSERT_TRUE("close model file", fclose(file) == 0);
 }
 
 static void assert_invalid_content(const char *name, const char *content,
@@ -64,7 +82,7 @@ static void assert_invalid_content(const char *name, const char *content,
     FemModel model;
 
     memset(&model, 0xA5, sizeof(model));
-    write_invalid_file(content);
+    write_model_file(INVALID_MODEL_PATH, content);
     ASSERT_STATUS(name, read_model_file(INVALID_MODEL_PATH, &model),
                   expected_status);
     assert_model_cleared(name, &model);
@@ -104,6 +122,51 @@ static void test_reference_model(void)
         ASSERT_NEAR("element E", model.elements[i].E, expected_elements[i].E, 0.0);
         ASSERT_NEAR("element A", model.elements[i].A, expected_elements[i].A, 0.0);
     }
+}
+
+static void test_noncontiguous_user_ids(void)
+{
+    const char *path = "stage8_noncontiguous.model";
+    const char *content =
+        "NODES 3\n"
+        "10 0 0\n"
+        "20 1000 0\n"
+        "40 500 800\n"
+        "\n"
+        "ELEMENTS 2\n"
+        "1 10 40 210000 100\n"
+        "2 20 40 210000 100\n"
+        "\n"
+        "LOADS 1\n"
+        "40 0 -10000\n"
+        "\n"
+        "CONSTRAINTS 3\n"
+        "10 1 1\n"
+        "20 0 1\n"
+        "40 0 0\n";
+    FemModel model;
+
+    write_model_file(path, content);
+    ASSERT_STATUS("read noncontiguous user ids",
+                  read_model_file(path, &model), FEM_OK);
+    ASSERT_TRUE("noncontiguous node count", model.node_count == 3);
+    ASSERT_TRUE("noncontiguous element count", model.element_count == 2);
+    ASSERT_TRUE("first noncontiguous node", model.nodes[0].id == 10);
+    ASSERT_TRUE("second noncontiguous node", model.nodes[1].id == 20);
+    ASSERT_TRUE("third noncontiguous node", model.nodes[2].id == 40);
+    ASSERT_NEAR("noncontiguous load fx", model.nodes[2].fx, 0.0, 0.0);
+    ASSERT_NEAR("noncontiguous load fy", model.nodes[2].fy, -10000.0, 0.0);
+    ASSERT_TRUE("first noncontiguous constraint x", model.nodes[0].fix_x == 1);
+    ASSERT_TRUE("first noncontiguous constraint y", model.nodes[0].fix_y == 1);
+    ASSERT_TRUE("second noncontiguous constraint x", model.nodes[1].fix_x == 0);
+    ASSERT_TRUE("second noncontiguous constraint y", model.nodes[1].fix_y == 1);
+    ASSERT_TRUE("third noncontiguous constraint x", model.nodes[2].fix_x == 0);
+    ASSERT_TRUE("third noncontiguous constraint y", model.nodes[2].fix_y == 0);
+    ASSERT_TRUE("first noncontiguous element node1", model.elements[0].node1 == 0);
+    ASSERT_TRUE("first noncontiguous element node2", model.elements[0].node2 == 2);
+    ASSERT_TRUE("second noncontiguous element node1", model.elements[1].node1 == 1);
+    ASSERT_TRUE("second noncontiguous element node2", model.elements[1].node2 == 2);
+    ASSERT_TRUE("remove noncontiguous model file", remove(path) == 0);
 }
 
 static void test_reference_model_end_to_end(void)
@@ -234,6 +297,7 @@ static void test_input_error_status_message(void)
 int main(void)
 {
     test_reference_model();
+    test_noncontiguous_user_ids();
     test_reference_model_end_to_end();
     test_invalid_inputs();
     test_missing_file_clears_model();
