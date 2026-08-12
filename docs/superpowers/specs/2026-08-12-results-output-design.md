@@ -37,6 +37,10 @@ FemStatus write_results_csv(const char *path,
                             const FemModel *model,
                             const FemResults *results);
 
+FemStatus write_results_markdown(const char *path,
+                                 const FemModel *model,
+                                 const FemResults *results);
+
 void print_debug_matrix(const char *name,
                         const double matrix[MAX_DOF][MAX_DOF],
                         int size);
@@ -74,6 +78,36 @@ residual_fx residual_fy
 
 节点段按 `model->node_count` 输出；单元段按 `model->element_count` 输出；反力段只输出同时具有约束自由度的节点，并分别把 `2*i` 与 `2*i+1` 的反力映射为 `rx`、`ry`，无约束方向输出零。状态输出为 `NEUTRAL`、`TENSION` 或 `COMPRESSION`。所有数值使用统一的 `%.12g` 格式。
 
+## Markdown 格式
+
+Markdown 是适合在项目报告、代码托管平台或教学记录中直接阅读的结果报告。它使用固定标题和表头，包含节点位移、单元结果、支座反力和整体平衡摘要：
+
+```markdown
+# 2D Truss FEM Results
+
+## Nodal Displacements
+| Node ID | ux | uy |
+|---:|---:|---:|
+| ... | ... | ... |
+
+## Element Results
+| Element ID | Elongation | Strain | Stress | Axial Force | State |
+|---:|---:|---:|---:|---:|---|
+| ... | ... | ... | ... | ... | ... |
+
+## Support Reactions
+| Node ID | rx | ry |
+|---:|---:|---:|
+| ... | ... | ... |
+
+## Equilibrium
+| Residual Fx | Residual Fy |
+|---:|---:|
+| ... | ... |
+```
+
+Markdown 数值同样使用 `%.12g`，状态输出为 `NEUTRAL`、`TENSION` 或 `COMPRESSION`，用户节点/单元 ID 直接来自模型。
+
 ## CSV 格式
 
 CSV 使用单一稳定宽表，首列 `record_type` 区分记录类型，避免多个文件或不规则表头：
@@ -109,12 +143,13 @@ SUMMARY,,,,,,,,,,,<residual_fx>,<residual_fy>
 新增 `tests/test_stage9.c`，使用临时文件并读取回内容，覆盖：
 
 1. TXT 包含节点、单元、反力、平衡残差和状态文本；
-2. CSV 首行严格匹配稳定表头，NODE/ELEMENT/REACTION/SUMMARY 记录可解析；
-3. 非连续用户 ID 正确输出，未泄漏内部索引；
-4. 空指针、非法计数、重复约束自由度和非有限结果被拒绝；
-5. 不可创建的输出路径返回错误；
-6. Debug 矩阵和向量输出包含名称、维度和值；
-7. Stage1–8 回归测试、Demo 和 Docker 构建继续通过。
+2. Markdown 包含固定标题、表头、节点/单元/反力表和平衡摘要；
+3. CSV 首行严格匹配稳定表头，NODE/ELEMENT/REACTION/SUMMARY 记录可解析；
+4. 非连续用户 ID 正确输出，未泄漏内部索引；
+5. 空指针、非法计数、重复约束自由度和非有限结果被拒绝；
+6. 不可创建的输出路径返回错误；
+7. Debug 矩阵和向量输出包含名称、维度和值；
+8. Stage1–8 回归测试、Demo 和 Docker 构建继续通过。
 
 测试使用真实输出文件和真实模块，不通过 mock 验证实现细节。输出文件写入临时目录，测试结束后删除。
 
