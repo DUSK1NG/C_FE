@@ -1,75 +1,77 @@
-# 2D Truss FEM
+# 二维桁架有限元
 
-This repository contains a fixed-capacity C11 implementation of a two-dimensional truss finite-element workflow. It demonstrates element geometry and stiffness, global assembly, loads and constraints, constrained solving, support reactions, text input, result export, and project-level verification.
+本仓库提供一个固定容量的 C11 二维桁架有限元实现，用于演示单元几何与刚度、整体组装、荷载与约束、约束求解、支座反力、文本输入、结果导出以及项目级验证。
 
-## Project status
+## 项目状态
 
-Stages 1–10 are complete and consolidated in the `main` branch. The implementation remains within the fixed-capacity C11 scope described below, with the Stage 10 contract covering model parsing, solving, reactions, post-processing, and TXT/Markdown/CSV result export.
+Stage 1–10 已完成，并已整合到 `main` 分支。实现仍遵循下文所述的固定容量 C11 范围；Stage 10 契约覆盖模型解析、求解、支座反力、单元后处理以及 TXT/Markdown/CSV 结果导出。
 
-Before publishing changes, verify the working tree and whitespace with:
+提交或发布变更前，可以运行以下命令检查工作区和空白字符：
 
 ```text
 git status --short --branch
 git diff --check
 ```
 
-## Scope and assumptions
+## 范围与假设
 
-- Structures are planar, pin-jointed trusses with two translational degrees of freedom per node.
-- Elements are straight axial members with constant Young's modulus `E` and area `A`.
-- Nodes and elements use positive user IDs; model input maps those IDs to internal fixed-array indices.
-- Loads and support constraints are applied at nodal degrees of freedom.
-- The implementation uses C11 and the standard C library only.
+- 结构为平面铰接桁架，每个节点包含两个平移自由度。
+- 单元为直线轴向杆件，采用常量杨氏模量 `E` 和截面积 `A`。
+- 节点和单元使用正整数用户 ID；模型输入会将这些 ID 映射到内部固定数组索引。
+- 荷载和支座约束施加在节点自由度上。
+- 实现仅使用 C11 和标准 C 库。
 
-## Stage status
+## 阶段状态
 
-Stages 1–10 are represented in the current project:
+当前项目已实现 Stage 1–10：
 
-- Stage 1: single-element geometry, direction cosines, and stiffness demonstration.
-- Stage 2: global stiffness assembly and force-vector behavior.
-- Stage 3: degree-of-freedom identification and validation.
-- Stage 4: constrained-system preparation and numerical edge-case coverage.
-- Stage 5: fixed-capacity constrained linear solving.
-- Stage 6: element post-processing and state classification.
-- Stage 7: support reactions and global equilibrium checks.
-- Stage 8: fixed-capacity model-file parsing.
-- Stage 9: TXT, Markdown, and CSV result exporters plus Debug matrix/vector printers.
-- Stage 10: medium/large model fixtures, end-to-end result export, Docker verification, and project documentation.
+- Stage 1：单元几何、方向余弦和刚度矩阵演示。
+- Stage 2：整体刚度矩阵组装和力向量行为。
+- Stage 3：自由度识别与输入校验。
+- Stage 4：约束系统准备和数值边界情况覆盖。
+- Stage 5：固定容量约束线性求解。
+- Stage 6：单元后处理和状态分类。
+- Stage 7：支座反力和整体平衡检查。
+- Stage 8：固定容量模型文件解析。
+- Stage 9：TXT、Markdown 和 CSV 结果导出，以及 Debug 矩阵/向量打印。
+- Stage 10：中型/大型模型夹具、端到端结果导出、Docker 验证和项目文档。
 
-## Docker verification
+## Docker 验证
 
-From the repository root:
+从仓库根目录运行：
 
 ```text
 docker build --load -t c-fe-stage10-project-organization .
 docker run --rm c-fe-stage10-project-organization
 ```
 
-The builder compiles the Stage 1, Stage 6, Stage 7, Stage 8, Stage 9, and Stage 10 checks. The runtime image retains the Stage 1 Demo entry point:
+构建阶段会编译 Stage 1、Stage 6、Stage 7、Stage 8、Stage 9 和 Stage 10 检查。运行时镜像保留 Stage 1 Demo 入口：
 
 ```text
 CMD ["./fem"]
 ```
 
-## Local C11 commands
+## 本地 C11 命令
 
-The Stage 10 contract test can be compiled and run from the repository root with:
+在仓库根目录编译并运行 Stage 10 契约测试：
 
 ```text
 gcc -std=c11 -Wall -Wextra -pedantic tests/test_stage10.c src/fem.c src/solver.c src/reactions.c src/postprocess.c src/io.c src/output.c -Iinclude -o test_stage10 -lm
 ./test_stage10
 ```
 
-The Stage 1 Demo can be built with:
+在 Windows PowerShell 中，也可以使用 `.\test_stage10.exe` 运行生成的程序。
+
+编译并运行 Stage 1 Demo：
 
 ```text
 gcc -std=c11 -Wall -Wextra -pedantic src/main.c src/fem.c src/solver.c -Iinclude -o fem -lm
 ./fem
 ```
 
-## Stage 8 input format
+## Stage 8 输入格式
 
-Model files contain these sections in order:
+模型文件必须按以下顺序包含这些区段：
 
 ```text
 NODES <count>
@@ -85,24 +87,24 @@ CONSTRAINTS <count>
 <node_id> <fix_x> <fix_y>
 ```
 
-Blank lines and full-line `#` comments are accepted. Node and element capacities are fixed at 10 and 20 respectively; the parser does not allocate memory dynamically.
+支持空行和整行 `#` 注释。节点容量固定为 10，单元容量固定为 20；解析器不会动态分配内存。
 
-## Stage 9 result output
+## Stage 9 结果输出
 
-The output module provides:
+输出模块提供以下接口：
 
-- `write_results_txt` for a human-readable sectioned report.
-- `write_results_markdown` for a report with fixed headings and tables.
-- `write_results_csv` for stable wide records with `NODE`, `ELEMENT`, `REACTION`, and `SUMMARY` rows.
-- `print_debug_matrix` and `print_debug_vector` for explicit Debug diagnostics.
+- `write_results_txt`：输出便于阅读的分区报告。
+- `write_results_markdown`：输出包含固定标题和表格的报告。
+- `write_results_csv`：输出稳定的宽表记录，包含 `NODE`、`ELEMENT`、`REACTION` 和 `SUMMARY` 行。
+- `print_debug_matrix` 和 `print_debug_vector`：输出明确标记为 Debug 的诊断信息。
 
-## Stage 10 fixtures
+## Stage 10 模型夹具
 
-- `tests/data/medium.model` contains 6 nodes and 8 elements. Its approved stable topology uses X/Y supports at nodes 1 and 3.
-- `tests/data/large.model` contains 10 nodes and 20 elements. Elements 19–20 are treated as interior web diagonals.
+- `tests/data/medium.model` 包含 6 个节点和 8 个单元，其批准的稳定拓扑在节点 1 和节点 3 设置 X/Y 约束。
+- `tests/data/large.model` 包含 10 个节点和 20 个单元，其中第 19–20 个单元作为内部网格斜杆处理。
 
-The Stage 10 contract reads both fixtures, assembles and solves each model, computes reactions and element results, checks equilibrium, and writes case-specific TXT, Markdown, and CSV files before removing those generated files.
+Stage 10 契约会读取两个模型，完成刚度组装、荷载构建、自由度识别、位移求解、支座反力计算和单元结果计算，检查整体平衡，并为每个模型写出 TXT、Markdown 和 CSV 文件，最后删除生成的文件。
 
-## Fixed capacities and non-goals
+## 固定容量与非目标
 
-The project uses `MAX_NODES=10`, `MAX_ELEMENTS=20`, and `MAX_DOF=2*MAX_NODES` fixed arrays. Dynamic allocation and third-party numerical libraries are outside the project scope. Stage 10 does not add a command-line interface, persistent result database, mesh generator, nonlinear material model, or general-purpose solver beyond the fixed-capacity 2D truss workflow.
+项目使用 `MAX_NODES=10`、`MAX_ELEMENTS=20` 和 `MAX_DOF=2*MAX_NODES` 固定数组。动态内存分配和第三方数值库不在项目范围内。Stage 10 不增加命令行界面、持久化结果数据库、网格生成器、非线性材料模型，也不提供超出固定容量二维桁架工作流的一般用途求解器。
