@@ -1,5 +1,4 @@
 # 编译警告清理与可维护性优化实施计划
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
 **Goal:** 让 Stage1–Stage10 契约测试和 Stage1 演示程序在 C11、-Wall -Wextra -pedantic 下无编译警告，同时保持 FEM 公共接口、数值算法和输出行为不变。
@@ -339,4 +338,3 @@ git branch --show-current
 ~~~
 
 预期：分支仍为 stage9-results-output，HEAD 仍为 f109bcd43e2f3db9407fcd6dafba05d9ced86e1a，工作区无未提交修改。
-
