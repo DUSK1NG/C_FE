@@ -159,9 +159,9 @@ git commit -m "test: define stage 10 scale-up regression"
 
 - [ ] **Step 1: Write `medium.model`**
 
-Create a valid six-node, eight-element two-row truss. Use bottom nodes `(0,0)`, `(1000,0)`, `(2000,0)`, top nodes `(500,800)`, `(1500,800)`, `(2500,800)`. Use bottom chord elements, top chord elements, two end posts, and two diagonal web elements for exactly 8 elements. Use `E=210000`, `A=100` for every element, constrain node 1 in X/Y and node 3 in Y, and apply finite downward loads to top nodes 4–6.
+Create a valid six-node, eight-element two-row truss. Use bottom nodes `(0,0)`, `(1000,0)`, `(2000,0)`, top nodes `(500,800)`, `(1500,800)`, `(2500,800)`. Use bottom chord elements, top chord elements, two end posts, and two diagonal web elements for exactly 8 elements. Use `E=210000`, `A=100` for every element, constrain node 1 in X/Y and node 3 in X/Y to remove the rigid-body mode, and apply finite downward loads to top nodes 4–6.
 
-Approved interpretation: because the top row is offset by half a panel, the two planned interior members are web diagonals rather than geometric verticals. Preserve the exact coordinates and element connectivity below; treat the earlier phrase as two additional interior web diagonals.
+Approved interpretation: the medium fixture uses the stable 8-member topology approved during Task 2 diagnosis. Preserve the exact coordinates, loads, and X/Y supports below; the topology is intentionally a compact two-row truss rather than the original singular connectivity.
 
 Use the following exact file content:
 
@@ -178,13 +178,13 @@ NODES 6
 
 ELEMENTS 8
 1 1 2 210000 100
-2 2 3 210000 100
-3 4 5 210000 100
-4 5 6 210000 100
-5 1 4 210000 100
+2 1 4 210000 100
+3 1 5 210000 100
+4 2 6 210000 100
+5 3 4 210000 100
 6 3 6 210000 100
-7 2 4 210000 100
-8 2 5 210000 100
+7 4 5 210000 100
+8 5 6 210000 100
 
 LOADS 3
 4 0 -10000
@@ -193,7 +193,7 @@ LOADS 3
 
 CONSTRAINTS 2
 1 1 1
-3 0 1
+3 1 1
 ```
 
 - [ ] **Step 2: Write `large.model`**
