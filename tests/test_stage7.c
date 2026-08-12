@@ -6,6 +6,7 @@
 #include "config.h"
 #include "fem.h"
 #include "reactions.h"
+#include "test_helpers.h"
 
 #define REACTION_TOL 1.0e-6
 #define EQUILIBRIUM_TOL 1.0e-8
@@ -106,7 +107,7 @@ static FemStatus build_reference_triangle(ReferenceTriangle *reference)
         return FEM_INVALID_ARGUMENT;
     }
     status = solve_constrained_system(
-        (const double (*)[MAX_DOF])reference->global_k,
+        test_readonly_matrix(reference->global_k),
         reference->force, free_dofs, free_count, constrained_dofs,
         constrained_count, reference->displacement);
     if (status != FEM_OK) {
@@ -130,7 +131,7 @@ static void test_reference_reactions_and_equilibrium(void)
                   build_reference_triangle(&reference), FEM_OK);
     expect_status(
         "calculate reference support reactions",
-        calculate_support_reactions(reference.global_k, reference.force,
+        calculate_support_reactions(test_readonly_matrix(reference.global_k), reference.force,
                                     reference.displacement,
                                     reference.constrained_dofs, 3, reactions),
         FEM_OK);
@@ -159,7 +160,7 @@ static void test_empty_constraints_are_valid(void)
                   build_reference_triangle(&reference), FEM_OK);
     fill_vector(reactions, 77.0);
     expect_status("empty constraints",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               reference.constrained_dofs, 0,
@@ -179,7 +180,7 @@ static void test_invalid_constraints_clear_reactions(void)
                   build_reference_triangle(&reference), FEM_OK);
     fill_vector(reactions, 77.0);
     expect_status("out-of-range constraint",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               invalid_dofs, 1, reactions),
@@ -188,7 +189,7 @@ static void test_invalid_constraints_clear_reactions(void)
 
     fill_vector(reactions, 77.0);
     expect_status("duplicate constraint",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               duplicate_dofs, 2, reactions),
@@ -215,7 +216,7 @@ static void test_null_arguments_clear_reactions(void)
 
     fill_vector(reactions, 77.0);
     expect_status("null force vector",
-                  calculate_support_reactions(reference.global_k, NULL,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k), NULL,
                                               reference.displacement,
                                               reference.constrained_dofs, 3,
                                               reactions),
@@ -224,7 +225,7 @@ static void test_null_arguments_clear_reactions(void)
 
     fill_vector(reactions, 77.0);
     expect_status("null displacement vector",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force, NULL,
                                               reference.constrained_dofs, 3,
                                               reactions),
@@ -233,7 +234,7 @@ static void test_null_arguments_clear_reactions(void)
 
     fill_vector(reactions, 77.0);
     expect_status("null constrained DOFs",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement, NULL, 3,
                                               reactions),
@@ -241,7 +242,7 @@ static void test_null_arguments_clear_reactions(void)
     expect_zero_vector("null constrained DOFs output", reactions);
 
     expect_status("null reactions output",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               reference.constrained_dofs, 3,
@@ -261,7 +262,7 @@ static void test_nonfinite_and_invalid_count_inputs_clear_reactions(void)
     reference.global_k[0][0] = NAN;
     fill_vector(reactions, 77.0);
     expect_status("NaN global matrix",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               reference.constrained_dofs, 3,
@@ -274,7 +275,7 @@ static void test_nonfinite_and_invalid_count_inputs_clear_reactions(void)
     reference.force[1] = NAN;
     fill_vector(reactions, 77.0);
     expect_status("NaN force vector",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               reference.constrained_dofs, 3,
@@ -287,7 +288,7 @@ static void test_nonfinite_and_invalid_count_inputs_clear_reactions(void)
     reference.displacement[2] = NAN;
     fill_vector(reactions, 77.0);
     expect_status("NaN displacement vector",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               reference.constrained_dofs, 3,
@@ -299,7 +300,7 @@ static void test_nonfinite_and_invalid_count_inputs_clear_reactions(void)
                   build_reference_triangle(&reference), FEM_OK);
     fill_vector(reactions, 77.0);
     expect_status("negative constraint count",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               invalid_count_dofs, -1,
@@ -309,7 +310,7 @@ static void test_nonfinite_and_invalid_count_inputs_clear_reactions(void)
 
     fill_vector(reactions, 77.0);
     expect_status("over-capacity constraint count",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               invalid_count_dofs, MAX_DOF + 1,
@@ -328,7 +329,7 @@ static void test_equilibrium_input_errors_clear_residuals(void)
     expect_status("build triangle for equilibrium errors",
                   build_reference_triangle(&reference), FEM_OK);
     expect_status("calculate reactions for equilibrium errors",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               reference.constrained_dofs, 3,
@@ -385,7 +386,7 @@ static void test_perturbed_displacement_reports_imbalance(void)
                   build_reference_triangle(&reference), FEM_OK);
     reference.displacement[4] += 1.0;
     expect_status("calculate perturbed reactions",
-                  calculate_support_reactions(reference.global_k,
+                  calculate_support_reactions(test_readonly_matrix(reference.global_k),
                                               reference.force,
                                               reference.displacement,
                                               reference.constrained_dofs, 3,
