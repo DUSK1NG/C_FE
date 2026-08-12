@@ -89,6 +89,43 @@ static void assert_invalid_content(const char *name, const char *content,
     ASSERT_TRUE("remove invalid model file", remove(INVALID_MODEL_PATH) == 0);
 }
 
+static void write_long_prefix_model_file(const char *path)
+{
+    static const char valid_model[] =
+        "NODES 2\n"
+        "1 0 0\n"
+        "2 1 0\n"
+        "ELEMENTS 1\n"
+        "1 1 2 1 1\n"
+        "LOADS 0\n"
+        "CONSTRAINTS 0\n";
+    FILE *file = fopen(path, "w");
+    int i;
+
+    ASSERT_TRUE("open long-prefix model file", file != NULL);
+    for (i = 0; i < 600; ++i) {
+        ASSERT_TRUE("write long blank line", fputc(' ', file) != EOF);
+    }
+    ASSERT_TRUE("terminate long blank line", fputc('\n', file) != EOF);
+    ASSERT_TRUE("start long comment line", fputc('#', file) != EOF);
+    for (i = 0; i < 600; ++i) {
+        ASSERT_TRUE("write long comment line", fputc('x', file) != EOF);
+    }
+    ASSERT_TRUE("terminate long comment line", fputc('\n', file) != EOF);
+    ASSERT_TRUE("write valid model after long prefix",
+                fputs(valid_model, file) >= 0);
+    for (i = 0; i < 600; ++i) {
+        ASSERT_TRUE("write trailing long blank line", fputc(' ', file) != EOF);
+    }
+    ASSERT_TRUE("terminate trailing long blank line", fputc('\n', file) != EOF);
+    ASSERT_TRUE("start trailing long comment line", fputc('#', file) != EOF);
+    for (i = 0; i < 600; ++i) {
+        ASSERT_TRUE("write trailing long comment line", fputc('x', file) != EOF);
+    }
+    ASSERT_TRUE("terminate trailing long comment line", fputc('\n', file) != EOF);
+    ASSERT_TRUE("close long-prefix model file", fclose(file) == 0);
+}
+
 static void test_reference_model(void)
 {
     const Node expected_nodes[3] = {
@@ -277,6 +314,45 @@ static void test_invalid_inputs(void)
                            FEM_CAPACITY_EXCEEDED);
 }
 
+static void test_long_blank_and_comment_lines(void)
+{
+    const char *path = "stage8_long_prefix.model";
+    FemModel model;
+
+    write_long_prefix_model_file(path);
+    ASSERT_STATUS("read long blank and comment lines",
+                  read_model_file(path, &model), FEM_OK);
+    ASSERT_TRUE("long-prefix node count", model.node_count == 2);
+    ASSERT_TRUE("long-prefix element count", model.element_count == 1);
+    ASSERT_TRUE("remove long-prefix model", remove(path) == 0);
+}
+
+static void test_out_of_range_integer_tokens(void)
+{
+    assert_invalid_content("out-of-range section count",
+                           "NODES 999999999999999999999\n",
+                           FEM_INPUT_ERROR);
+    assert_invalid_content("out-of-range node id",
+                           "NODES 2\n4294967297 0 0\n2 1 0\n\n"
+                           "ELEMENTS 1\n1 4294967297 2 1 1\n\n"
+                           "LOADS 0\n\nCONSTRAINTS 0\n",
+                           FEM_INPUT_ERROR);
+    assert_invalid_content("out-of-range constraint flag",
+                           "NODES 2\n1 0 0\n2 1 0\n\n"
+                           "ELEMENTS 1\n1 1 2 1 1\n\nLOADS 0\n\n"
+                           "CONSTRAINTS 1\n1 4294967296 0\n",
+                           FEM_INPUT_ERROR);
+}
+
+static void test_nonfinite_geometry_is_input_error(void)
+{
+    assert_invalid_content("nonfinite geometry",
+                           "NODES 2\n1 1e308 0\n2 -1e308 0\n\n"
+                           "ELEMENTS 1\n1 1 2 1 1\n\nLOADS 0\n\n"
+                           "CONSTRAINTS 0\n",
+                           FEM_INPUT_ERROR);
+}
+
 static void test_missing_file_clears_model(void)
 {
     FemModel model;
@@ -300,6 +376,9 @@ int main(void)
     test_noncontiguous_user_ids();
     test_reference_model_end_to_end();
     test_invalid_inputs();
+    test_long_blank_and_comment_lines();
+    test_out_of_range_integer_tokens();
+    test_nonfinite_geometry_is_input_error();
     test_missing_file_clears_model();
     test_input_error_status_message();
 

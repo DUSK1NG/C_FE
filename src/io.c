@@ -1,8 +1,11 @@
 #include "io.h"
 
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define LINE_BUFFER_SIZE 512
@@ -34,11 +37,43 @@ static int is_blank_or_comment(const char *line)
     return *line == '\0' || *line == '#';
 }
 
+static int consume_long_blank_or_comment(FILE *file,
+                                         char line[LINE_BUFFER_SIZE])
+{
+    int in_comment = 0;
+
+    for (;;) {
+        const char *cursor = line;
+
+        while (*cursor != '\0') {
+            if (in_comment) {
+                ++cursor;
+            } else if (isspace((unsigned char)*cursor)) {
+                ++cursor;
+            } else if (*cursor == '#') {
+                in_comment = 1;
+                ++cursor;
+            } else {
+                return 0;
+            }
+        }
+        if (strchr(line, '\n') != NULL || feof(file)) {
+            return 1;
+        }
+        if (fgets(line, LINE_BUFFER_SIZE, file) == NULL) {
+            return 0;
+        }
+    }
+}
+
 static FemStatus read_content_line(FILE *file, char line[LINE_BUFFER_SIZE])
 {
     while (fgets(line, LINE_BUFFER_SIZE, file) != NULL) {
         if (strchr(line, '\n') == NULL && !feof(file)) {
-            return FEM_INPUT_ERROR;
+            if (!consume_long_blank_or_comment(file, line)) {
+                return FEM_INPUT_ERROR;
+            }
+            continue;
         }
         if (!is_blank_or_comment(line)) {
             return FEM_OK;
@@ -47,13 +82,64 @@ static FemStatus read_content_line(FILE *file, char line[LINE_BUFFER_SIZE])
     return FEM_INPUT_ERROR;
 }
 
-static int parse_header(const char *line, const char *section, int *count)
+static int split_tokens(char *line, char *tokens[], int expected_count)
 {
-    char name[16];
-    char extra;
+    int count = 0;
+    char *cursor = line;
 
-    return sscanf(line, "%15s %d %c", name, count, &extra) == 2 &&
-           strcmp(name, section) == 0;
+    while (*cursor != '\0') {
+        while (isspace((unsigned char)*cursor)) {
+            ++cursor;
+        }
+        if (*cursor == '\0') {
+            break;
+        }
+        if (count == expected_count) {
+            return 0;
+        }
+        tokens[count] = cursor;
+        count += 1;
+        while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
+            ++cursor;
+        }
+        if (*cursor != '\0') {
+            *cursor = '\0';
+            ++cursor;
+        }
+    }
+    return count == expected_count;
+}
+
+static int parse_int_token(const char *token, int *value)
+{
+    char *end;
+    long parsed;
+
+    errno = 0;
+    parsed = strtol(token, &end, 10);
+    if (errno == ERANGE || *token == '\0' || *end != '\0' ||
+        parsed < INT_MIN || parsed > INT_MAX) {
+        return 0;
+    }
+    *value = (int)parsed;
+    return 1;
+}
+
+static int parse_double_token(const char *token, double *value)
+{
+    char *end;
+
+    errno = 0;
+    *value = strtod(token, &end);
+    return *token != '\0' && *end == '\0';
+}
+
+static int parse_header(char *line, const char *section, int *count)
+{
+    char *tokens[2];
+
+    return split_tokens(line, tokens, 2) && strcmp(tokens[0], section) == 0 &&
+           parse_int_token(tokens[1], count);
 }
 
 static int find_node_index(const int node_ids[MAX_NODES], int node_count,
@@ -101,11 +187,13 @@ static FemStatus read_nodes(FILE *file, FemModel *parsed)
 
     for (i = 0; i < count; ++i) {
         Node *node = &parsed->nodes[i];
-        char extra;
+        char *tokens[3];
 
         if (read_content_line(file, line) != FEM_OK ||
-            sscanf(line, "%d %lf %lf %c", &node->id, &node->x,
-                   &node->y, &extra) != 3) {
+            !split_tokens(line, tokens, 3) ||
+            !parse_int_token(tokens[0], &node->id) ||
+            !parse_double_token(tokens[1], &node->x) ||
+            !parse_double_token(tokens[2], &node->y)) {
             return FEM_INPUT_ERROR;
         }
     }
@@ -134,11 +222,15 @@ static FemStatus read_elements(FILE *file, FemModel *parsed)
         Element *element = &parsed->elements[i];
         int node1_id;
         int node2_id;
-        char extra;
+        char *tokens[5];
 
         if (read_content_line(file, line) != FEM_OK ||
-            sscanf(line, "%d %d %d %lf %lf %c", &element->id, &node1_id,
-                   &node2_id, &element->E, &element->A, &extra) != 5) {
+            !split_tokens(line, tokens, 5) ||
+            !parse_int_token(tokens[0], &element->id) ||
+            !parse_int_token(tokens[1], &node1_id) ||
+            !parse_int_token(tokens[2], &node2_id) ||
+            !parse_double_token(tokens[3], &element->E) ||
+            !parse_double_token(tokens[4], &element->A)) {
             return FEM_INPUT_ERROR;
         }
         element->node1 = node1_id;
@@ -164,11 +256,13 @@ static FemStatus read_loads(FILE *file, LoadRecord records[MAX_NODES],
     }
 
     for (i = 0; i < count; ++i) {
-        char extra;
+        char *tokens[3];
 
         if (read_content_line(file, line) != FEM_OK ||
-            sscanf(line, "%d %lf %lf %c", &records[i].node_id,
-                   &records[i].fx, &records[i].fy, &extra) != 3) {
+            !split_tokens(line, tokens, 3) ||
+            !parse_int_token(tokens[0], &records[i].node_id) ||
+            !parse_double_token(tokens[1], &records[i].fx) ||
+            !parse_double_token(tokens[2], &records[i].fy)) {
             return FEM_INPUT_ERROR;
         }
     }
@@ -193,11 +287,13 @@ static FemStatus read_constraints(FILE *file,
     }
 
     for (i = 0; i < count; ++i) {
-        char extra;
+        char *tokens[3];
 
         if (read_content_line(file, line) != FEM_OK ||
-            sscanf(line, "%d %d %d %c", &records[i].node_id,
-                   &records[i].fix_x, &records[i].fix_y, &extra) != 3) {
+            !split_tokens(line, tokens, 3) ||
+            !parse_int_token(tokens[0], &records[i].node_id) ||
+            !parse_int_token(tokens[1], &records[i].fix_x) ||
+            !parse_int_token(tokens[2], &records[i].fix_y)) {
             return FEM_INPUT_ERROR;
         }
     }
@@ -253,6 +349,10 @@ static FemStatus validate_elements(FemModel *parsed,
                                             element);
         if (status != FEM_OK) {
             return status;
+        }
+        if (!isfinite(element->length) || !isfinite(element->c) ||
+            !isfinite(element->s)) {
+            return FEM_INPUT_ERROR;
         }
     }
     return FEM_OK;
@@ -315,7 +415,10 @@ static FemStatus validate_end_of_file(FILE *file)
 
     while (fgets(line, LINE_BUFFER_SIZE, file) != NULL) {
         if (strchr(line, '\n') == NULL && !feof(file)) {
-            return FEM_INPUT_ERROR;
+            if (!consume_long_blank_or_comment(file, line)) {
+                return FEM_INPUT_ERROR;
+            }
+            continue;
         }
         if (!is_blank_or_comment(line)) {
             return FEM_INPUT_ERROR;
