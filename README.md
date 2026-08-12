@@ -2,6 +2,17 @@
 
 This repository contains a fixed-capacity C11 implementation of a two-dimensional truss finite-element workflow. It demonstrates element geometry and stiffness, global assembly, loads and constraints, constrained solving, support reactions, text input, result export, and project-level verification.
 
+## Project status
+
+Stages 1–10 are complete and consolidated in the `main` branch. The implementation remains within the fixed-capacity C11 scope described below, with the Stage 10 contract covering model parsing, solving, reactions, post-processing, and TXT/Markdown/CSV result export.
+
+Before publishing changes, verify the working tree and whitespace with:
+
+```text
+git status --short --branch
+git diff --check
+```
+
 ## Scope and assumptions
 
 - Structures are planar, pin-jointed trusses with two translational degrees of freedom per node.
