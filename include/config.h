@@ -12,4 +12,7 @@
 #define MAX_ELEMENTS 20
 #define MAX_DOF (2 * MAX_NODES)
 
+#define MAX_NODES 10
+#define MAX_DOF (2 * MAX_NODES)
+
 #endif
