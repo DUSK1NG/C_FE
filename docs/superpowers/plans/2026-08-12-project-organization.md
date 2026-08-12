@@ -161,6 +161,8 @@ git commit -m "test: define stage 10 scale-up regression"
 
 Create a valid six-node, eight-element two-row truss. Use bottom nodes `(0,0)`, `(1000,0)`, `(2000,0)`, top nodes `(500,800)`, `(1500,800)`, `(2500,800)`. Use bottom chord elements, top chord elements, two end posts, and two diagonal web elements for exactly 8 elements. Use `E=210000`, `A=100` for every element, constrain node 1 in X/Y and node 3 in Y, and apply finite downward loads to top nodes 4–6.
 
+Approved interpretation: because the top row is offset by half a panel, the two planned interior members are web diagonals rather than geometric verticals. Preserve the exact coordinates and element connectivity below; treat the earlier phrase as two additional interior web diagonals.
+
 Use the following exact file content:
 
 ```text
