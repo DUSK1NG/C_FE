@@ -27,6 +27,12 @@ RUN gcc -std=c11 -Wall -Wextra -pedantic \
 
 RUN ./test_stage6
 
+RUN gcc -std=c11 -Wall -Wextra -pedantic \
+        tests/test_stage7.c src/fem.c src/solver.c src/reactions.c \
+        -Iinclude -o test_stage7 -lm
+
+RUN ./test_stage7
+
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
