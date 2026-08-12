@@ -50,8 +50,10 @@ static void expect_matrix(double actual[4][4],
 
 static void test_horizontal_element(void)
 {
-    Node node_i = {1, 0.0, 0.0};
-    Node node_j = {2, 1000.0, 0.0};
+    Node node_i = {.id = 1, .x = 0.0, .y = 0.0, .fx = 0.0, .fy = 0.0,
+                   .fix_x = 0, .fix_y = 0};
+    Node node_j = {.id = 2, .x = 1000.0, .y = 0.0, .fx = 0.0, .fy = 0.0,
+                   .fix_x = 0, .fix_y = 0};
     Element element = {1, 0, 1, 210000.0, 100.0, 0.0, 0.0, 0.0};
     double ke[4][4];
     const double expected[4][4] = {
@@ -76,8 +78,10 @@ static void test_horizontal_element(void)
 
 static void test_diagonal_element(void)
 {
-    Node node_i = {1, 0.0, 0.0};
-    Node node_j = {2, 500.0, 800.0};
+    Node node_i = {.id = 1, .x = 0.0, .y = 0.0, .fx = 0.0, .fy = 0.0,
+                   .fix_x = 0, .fix_y = 0};
+    Node node_j = {.id = 2, .x = 500.0, .y = 800.0, .fx = 0.0, .fy = 0.0,
+                   .fix_x = 0, .fix_y = 0};
     Element element = {1, 0, 1, 210000.0, 100.0, 0.0, 0.0, 0.0};
     double ke[4][4];
     const double expected[4][4] = {
@@ -106,8 +110,10 @@ static void test_diagonal_element(void)
 
 static void test_zero_length_element(void)
 {
-    Node node_i = {1, 10.0, 20.0};
-    Node node_j = {2, 10.0, 20.0};
+    Node node_i = {.id = 1, .x = 10.0, .y = 20.0, .fx = 0.0, .fy = 0.0,
+                   .fix_x = 0, .fix_y = 0};
+    Node node_j = {.id = 2, .x = 10.0, .y = 20.0, .fx = 0.0, .fy = 0.0,
+                   .fix_x = 0, .fix_y = 0};
     Element element = {1, 0, 1, 210000.0, 100.0, 0.0, 0.0, 0.0};
 
     expect_status("zero-length geometry",

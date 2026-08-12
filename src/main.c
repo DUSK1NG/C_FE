@@ -19,8 +19,10 @@ static void print_matrix(double matrix[4][4])
 
 int main(void)
 {
-    const Node node_i = {1, 0.0, 0.0};
-    const Node node_j = {2, 500.0, 800.0};
+    const Node node_i = {.id = 1, .x = 0.0, .y = 0.0, .fx = 0.0,
+                         .fy = 0.0, .fix_x = 0, .fix_y = 0};
+    const Node node_j = {.id = 2, .x = 500.0, .y = 800.0, .fx = 0.0,
+                         .fy = 0.0, .fix_x = 0, .fix_y = 0};
     Element element = {1, 0, 1, 210000.0, 100.0, 0.0, 0.0, 0.0};
     double ke[4][4];
     FemStatus status;

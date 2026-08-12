@@ -96,9 +96,12 @@ static void expect_tail_zero(double matrix[MAX_DOF][MAX_DOF])
 static void test_triangle_assembly(void)
 {
     const Node nodes[3] = {
-        {1, 0.0, 0.0},
-        {2, 1000.0, 0.0},
-        {3, 500.0, 800.0}
+        {.id = 1, .x = 0.0, .y = 0.0, .fx = 0.0, .fy = 0.0,
+         .fix_x = 0, .fix_y = 0},
+        {.id = 2, .x = 1000.0, .y = 0.0, .fx = 0.0, .fy = 0.0,
+         .fix_x = 0, .fix_y = 0},
+        {.id = 3, .x = 500.0, .y = 800.0, .fx = 0.0, .fy = 0.0,
+         .fix_x = 0, .fix_y = 0}
     };
     Element elements[3] = {
         {1, 0, 1, 210000.0, 100.0, 0.0, 0.0, 0.0},
@@ -121,9 +124,12 @@ static void test_triangle_assembly(void)
 static void test_invalid_index_clears_matrix(void)
 {
     const Node nodes[3] = {
-        {1, 0.0, 0.0},
-        {2, 1000.0, 0.0},
-        {3, 500.0, 800.0}
+        {.id = 1, .x = 0.0, .y = 0.0, .fx = 0.0, .fy = 0.0,
+         .fix_x = 0, .fix_y = 0},
+        {.id = 2, .x = 1000.0, .y = 0.0, .fx = 0.0, .fy = 0.0,
+         .fix_x = 0, .fix_y = 0},
+        {.id = 3, .x = 500.0, .y = 800.0, .fx = 0.0, .fy = 0.0,
+         .fix_x = 0, .fix_y = 0}
     };
     Element elements[1] = {
         {1, 0, 3, 210000.0, 100.0, 0.0, 0.0, 0.0}
