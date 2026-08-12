@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "config.h"
@@ -82,12 +83,46 @@ static int read_file(const char *path, char *buffer, size_t capacity)
     return 1;
 }
 
-static void assert_file_contains(const char *path, const char *text)
+static void assert_txt_node_row(const char *buffer, int expected_id,
+                                double expected_ux, double expected_uy)
 {
-    char buffer[8192];
+    const char *section;
+    const char *section_end;
+    const char *line;
 
-    assert(read_file(path, buffer, sizeof(buffer)) != 0);
-    assert(strstr(buffer, text) != NULL);
+    section = strstr(buffer, "Nodal Displacements");
+    assert(section != NULL);
+    section_end = strstr(section, "Element Results");
+    assert(section_end != NULL);
+
+    line = section;
+    while (line < section_end) {
+        int id;
+        double ux;
+        double uy;
+        int consumed;
+        const char *tail;
+
+        consumed = 0;
+        if (sscanf(line, "%d %lf %lf%n", &id, &ux, &uy, &consumed) == 3) {
+            tail = line + consumed;
+            while (tail < section_end && (*tail == ' ' || *tail == '\t' ||
+                                           *tail == '\r')) {
+                ++tail;
+            }
+            if ((tail == section_end || *tail == '\n') && id == expected_id &&
+                ux == expected_ux && uy == expected_uy) {
+                return;
+            }
+        }
+        line = strchr(line, '\n');
+        if (line == NULL || line >= section_end) {
+            break;
+        }
+        ++line;
+    }
+
+    assert(0 && "expected node row missing from TXT displacement table");
 }
 
 static void test_txt_contract(void)
@@ -102,7 +137,8 @@ static void test_txt_contract(void)
     assert(read_file(path, buffer, sizeof(buffer)) != 0);
     assert(strstr(buffer, "2D Truss FEM Results") != NULL);
     assert(strstr(buffer, "Nodal Displacements") != NULL);
-    assert(strstr(buffer, "10") != NULL);
+    assert_txt_node_row(buffer, 10, 0.0, 0.0);
+    assert_txt_node_row(buffer, 40, 0.125, 0.25);
     assert(strstr(buffer, "Element Results") != NULL);
     assert(strstr(buffer, "TENSION") != NULL);
     assert(strstr(buffer, "Support Reactions") != NULL);
@@ -130,7 +166,8 @@ static void test_markdown_contract(void)
     assert(strstr(buffer, "## Equilibrium") != NULL);
     assert(strstr(buffer, "| Node ID | ux | uy |") != NULL);
     assert(strstr(buffer, "| Element ID | Elongation | Strain | Stress | Axial Force | State |") != NULL);
-    assert(strstr(buffer, "| 10 |") != NULL);
+    assert(strstr(buffer, "| 10 | 0 | 0 |") != NULL);
+    assert(strstr(buffer, "| 40 | 0.125 | 0.25 |") != NULL);
     assert(strstr(buffer, "TENSION") != NULL);
     assert(remove(path) == 0);
 }
@@ -148,11 +185,13 @@ static void test_csv_contract(void)
     assert(write_results_csv(path, &model, &results) == FEM_OK);
     assert(read_file(path, buffer, sizeof(buffer)) != 0);
     assert(strncmp(buffer, header, strlen(header)) == 0);
-    assert(strstr(buffer, "NODE,10") != NULL);
+    assert(strstr(buffer, "\nNODE,10,0,0,") != NULL);
+    assert(strstr(buffer, "\nNODE,40,0.125,0.25,") != NULL);
     assert(strstr(buffer, "ELEMENT,7") != NULL);
     assert(strstr(buffer, "REACTION,10") != NULL);
     assert(strstr(buffer, "SUMMARY") != NULL);
-    assert(strstr(buffer, "NODE,0") == NULL);
+    assert(strstr(buffer, "\nNODE,0,") == NULL);
+    assert(strstr(buffer, "\nNODE,1,") == NULL);
     assert(remove(path) == 0);
 }
 
@@ -181,6 +220,9 @@ static void test_validation_and_file_errors(void)
     FemResults results;
     FemModel invalid_model;
     FemResults invalid_results;
+    FILE *blocking_file;
+    const char *blocking_path = "stage9_not_a_directory";
+    const char *unwritable_path = "stage9_not_a_directory/output.txt";
 
     build_fixture(&model, &results);
 
@@ -222,7 +264,16 @@ static void test_validation_and_file_errors(void)
     invalid_results.displacement[0] = NAN;
     assert_all_writers_reject("stage9_invalid.txt", &model, &invalid_results);
     invalid_results = results;
+    invalid_results.element_results[0].elongation = NAN;
+    assert_all_writers_reject("stage9_invalid.txt", &model, &invalid_results);
+    invalid_results = results;
+    invalid_results.element_results[0].strain = INFINITY;
+    assert_all_writers_reject("stage9_invalid.txt", &model, &invalid_results);
+    invalid_results = results;
     invalid_results.element_results[0].stress = INFINITY;
+    assert_all_writers_reject("stage9_invalid.txt", &model, &invalid_results);
+    invalid_results = results;
+    invalid_results.element_results[0].axial_force = NAN;
     assert_all_writers_reject("stage9_invalid.txt", &model, &invalid_results);
     invalid_results = results;
     invalid_results.reactions[0] = NAN;
@@ -237,11 +288,15 @@ static void test_validation_and_file_errors(void)
     invalid_results.residual_fy = NAN;
     assert_all_writers_reject("stage9_invalid.txt", &model, &invalid_results);
 
-    assert_all_writers_reject("missing-parent-stage9/output.txt", &model,
-                              &results);
+    remove(blocking_path);
+    blocking_file = fopen(blocking_path, "wb");
+    assert(blocking_file != NULL);
+    assert(fclose(blocking_file) == 0);
+    assert_all_writers_reject(unwritable_path, &model, &results);
+    assert(remove(blocking_path) == 0);
 }
 
-static void test_debug_contract(void)
+static void emit_debug_fixture(void)
 {
     double matrix[MAX_DOF][MAX_DOF] = {{0.0}};
     double vector[MAX_DOF] = {0.0};
@@ -257,13 +312,44 @@ static void test_debug_contract(void)
     print_debug_vector("F_original", vector, 2);
 }
 
-int main(void)
+static void test_debug_contract(const char *executable_path)
 {
+    char command[1024];
+    char buffer[8192];
+    const char *path = "stage9_debug.out";
+    int length;
+
+    remove(path);
+    length = snprintf(command, sizeof(command), "\"%s\" --emit-debug > \"%s\"",
+                      executable_path, path);
+    assert(length > 0 && (size_t)length < sizeof(command));
+    assert(system(command) == 0);
+    assert(read_file(path, buffer, sizeof(buffer)) != 0);
+    assert(strstr(buffer, "K_original") != NULL);
+    assert(strstr(buffer, "2x2") != NULL);
+    assert(strstr(buffer, "12.5") != NULL);
+    assert(strstr(buffer, "-3.25") != NULL);
+    assert(strstr(buffer, "4.75") != NULL);
+    assert(strstr(buffer, "8") != NULL);
+    assert(strstr(buffer, "F_original") != NULL);
+    assert(strstr(buffer, "6.5") != NULL);
+    assert(strstr(buffer, "-1.25") != NULL);
+    assert(remove(path) == 0);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc == 2 && strcmp(argv[1], "--emit-debug") == 0) {
+        emit_debug_fixture();
+        return 0;
+    }
+
+    assert(argc > 0);
     test_txt_contract();
     test_markdown_contract();
     test_csv_contract();
     test_validation_and_file_errors();
-    test_debug_contract();
+    test_debug_contract(argv[0]);
     puts("Stage 9 results output contract tests passed.");
     return 0;
 }
