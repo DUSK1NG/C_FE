@@ -17,7 +17,7 @@ The post-processing flow computes element elongation, strain, stress, axial forc
 7. Stage 7 computes support reactions and equilibrium residuals.
 8. Stage 8 parses fixed-capacity model files with ordered `NODES`, `ELEMENTS`, `LOADS`, and `CONSTRAINTS` sections.
 9. Stage 9 exports deterministic TXT, Markdown, and CSV results and exposes Debug printers.
-10. Stage 10 verifies medium and large model fixtures end to end and organizes Docker and project documentation.
+10. Stage 10 verifies medium and large model fixtures end to end and organizes project documentation.
 
 ## Medium and large model verification
 
@@ -25,23 +25,16 @@ The Stage 10 contract test reads `tests/data/medium.model` and requires 6 nodes 
 
 The medium fixture uses the approved stable topology with X/Y supports at nodes 1 and 3. The large fixture treats elements 19 and 20 as interior web diagonals. The verification checks finite element results and equilibrium tolerance through the existing test contract; this report does not add unverified reference numbers.
 
-## Output, Debug, and Docker verification
+## Output and Debug verification
 
 Stage 9 output functions are `write_results_txt`, `write_results_markdown`, and `write_results_csv`. They use user-facing node and element IDs, fixed numeric formatting, support reaction rows, and equilibrium summaries. `print_debug_matrix` and `print_debug_vector` are separate console diagnostics.
 
-The Stage 10 Docker builder retains the existing Stage 9 contract and Debug-output checks, then compiles and runs `tests/test_stage10.c` with the Stage 8 and Stage 9 production modules. The runtime image copies the Demo binary and retains `CMD ["./fem"]`. The exact Docker commands used for the current verification are:
-
-```text
-docker build --load -t c-fe-stage10-project-organization .
-docker run --rm c-fe-stage10-project-organization
-```
-
-The command results and exit codes for this task are recorded in the accompanying Task 3 report.
+The Stage 10 contract compiles and runs `tests/test_stage10.c` with the Stage 8 and Stage 9 production modules. The test validates both model fixtures, result exports, equilibrium checks, and cleanup of generated files.
 
 ## Warnings and fixed-capacity limitations
 
 The project intentionally uses fixed arrays: `MAX_NODES=10`, `MAX_ELEMENTS=20`, and `MAX_DOF=20`. Inputs and results beyond those limits are not supported. Dynamic allocation is not used.
 
-Known compiler warnings are inherited from earlier stages and are not introduced by the Stage 10 documentation/Docker changes. The verification record distinguishes any such warnings from Stage 10 output.
+Known compiler warnings are inherited from earlier stages and are not introduced by the Stage 10 documentation changes. The verification record distinguishes any such warnings from Stage 10 output.
 
 The project does not attempt nonlinear analysis, dynamic analysis, arbitrary-dimensional finite elements, automatic mesh generation, a general command-line workflow, or persistent result storage.

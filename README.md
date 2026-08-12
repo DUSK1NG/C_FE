@@ -34,22 +34,7 @@ git diff --check
 - Stage 7：支座反力和整体平衡检查。
 - Stage 8：固定容量模型文件解析。
 - Stage 9：TXT、Markdown 和 CSV 结果导出，以及 Debug 矩阵/向量打印。
-- Stage 10：中型/大型模型夹具、端到端结果导出、Docker 验证和项目文档。
-
-## Docker 验证
-
-从仓库根目录运行：
-
-```text
-docker build --load -t c-fe-stage10-project-organization .
-docker run --rm c-fe-stage10-project-organization
-```
-
-构建阶段会编译 Stage 1、Stage 6、Stage 7、Stage 8、Stage 9 和 Stage 10 检查。运行时镜像保留 Stage 1 Demo 入口：
-
-```text
-CMD ["./fem"]
-```
+- Stage 10：中型/大型模型夹具、端到端结果导出和项目文档。
 
 ## 本地 C11 命令
 
