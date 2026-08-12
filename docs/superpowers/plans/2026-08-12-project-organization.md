@@ -30,7 +30,7 @@
 - The test helper `run_model_case(const char *path, int expected_nodes, int expected_elements, const char *tag)` reads one fixture and runs the complete pipeline.
 - No production API is added.
 
-- [ ] **Step 1: Add the failing Stage10 pipeline test**
+- [x] **Step 1: Add the failing Stage10 pipeline test**
 
 In `tests/test_stage10.c`, define the following fixed-array pipeline for each fixture. Create only this C file in Task 1; do not create either model fixture until Task 2:
 
@@ -125,7 +125,7 @@ static int file_contains(const char *path, const char *needle)
 
 Use exact assertions for counts `6/8` and `10/20`. The test should reference `tests/data/medium.model` and `tests/data/large.model`, which are intentionally absent during the RED run.
 
-- [ ] **Step 2: Run the contract to verify RED**
+- [x] **Step 2: Run the contract to verify RED**
 
 Compile and run before the two model files exist:
 
@@ -137,7 +137,7 @@ gcc -std=c11 -Wall -Wextra -pedantic tests/test_stage10.c \
 
 Expected: compilation exits 0, then the test exits nonzero with a failed `read_model_file` assertion because the referenced fixture files do not exist. Do not create model fixtures or change production code in this task.
 
-- [ ] **Step 3: Commit the failing contract**
+- [x] **Step 3: Commit the failing contract**
 
 ```text
 git add tests/test_stage10.c
@@ -157,7 +157,7 @@ git commit -m "test: define stage 10 scale-up regression"
 - Use only the existing APIs and the `FemResults` structure from `include/output.h`.
 - No production source or public header changes are expected.
 
-- [ ] **Step 1: Write `medium.model`**
+- [x] **Step 1: Write `medium.model`**
 
 Create a valid six-node, eight-element two-row truss. Use bottom nodes `(0,0)`, `(1000,0)`, `(2000,0)`, top nodes `(500,800)`, `(1500,800)`, `(2500,800)`. Use bottom chord elements, top chord elements, two end posts, and two diagonal web elements for exactly 8 elements. Use `E=210000`, `A=100` for every element, constrain node 1 in X/Y and node 3 in X/Y to remove the rigid-body mode, and apply finite downward loads to top nodes 4–6.
 
@@ -196,7 +196,7 @@ CONSTRAINTS 2
 3 1 1
 ```
 
-- [ ] **Step 2: Write `large.model`**
+- [x] **Step 2: Write `large.model`**
 
 Create a valid ten-node, twenty-element two-row five-panel truss. Use bottom nodes `(0,0)`, `(1000,0)`, `(2000,0)`, `(3000,0)`, `(4000,0)` and top nodes `(500,800)`, `(1500,800)`, `(2500,800)`, `(3500,800)`, `(4500,800)`. Use 4 bottom-chord elements, 4 top-chord elements, 2 end posts, 8 alternating web diagonals, and 2 interior verticals for exactly 20 elements. Constrain node 1 in X/Y and node 5 in Y; apply finite downward loads to top nodes 6–10.
 
@@ -251,19 +251,19 @@ CONSTRAINTS 2
 5 0 1
 ```
 
-- [ ] **Step 3: Compile the Stage10 test strictly**
+- [x] **Step 3: Compile the Stage10 test strictly**
 
 Run the strict command from Task 1 after fixtures and test exist. Expected: compile exit code 0 under C11 with `-Wall -Wextra -pedantic`.
 
-- [ ] **Step 4: Run from a writable repository directory**
+- [x] **Step 4: Run from a writable repository directory**
 
 Run `./test_stage10` from the repository root so `tests/data/medium.model` and `tests/data/large.model` resolve exactly as written. Expected: both cases pass and all generated TXT/Markdown/CSV files are removed.
 
-- [ ] **Step 5: Verify negative and boundary facts in the test**
+- [x] **Step 5: Verify negative and boundary facts in the test**
 
 Add assertions that the medium case has exactly 6 nodes/8 elements, the large case has exactly 10 nodes/20 elements, all element states are one of the three existing enum values, and every output file contains the last user node ID and last element ID. Do not hard-code displacement values that are not part of an approved analytical reference.
 
-- [ ] **Step 6: Run all Stage1–Stage10 tests**
+- [x] **Step 6: Run all Stage1–Stage10 tests**
 
 Compile and run the existing Stage1–Stage9 tests with their established source lists, then compile/run Stage10. Expected: every test exits 0; inherited Stage1/Stage2 initializer and Stage7 qualifier warnings may remain, but Stage10 must introduce no new warning category.
 
@@ -283,7 +283,7 @@ gcc -std=c11 -Wall -Wextra -pedantic tests/test_stage9.c src/fem.c src/solver.c 
 
 Expected: every test exits 0; inherited Stage1/Stage2 initializer and Stage7 qualifier warnings may remain, but Stage10 must introduce no new warning category. Remove the temporary `test_stage1` through `test_stage10` executables after verification.
 
-- [ ] **Step 7: Run static checks and commit the green regression**
+- [x] **Step 7: Run static checks and commit the green regression**
 
 Run:
 
@@ -312,7 +312,7 @@ git commit -m "feat: add stage 10 scale-up regression"
 - Docker adds only a Stage10 compile/run layer after Stage9 and preserves the runtime image and `CMD ["./fem"]`.
 - Documentation references the actual Stage8 input format, Stage9 output APIs, fixed capacities, and verified test commands.
 
-- [ ] **Step 1: Add the Docker Stage10 check**
+- [x] **Step 1: Add the Docker Stage10 check**
 
 After the existing Stage9 test block, add:
 
@@ -325,15 +325,15 @@ RUN gcc -std=c11 -Wall -Wextra -pedantic \
 RUN ./test_stage10
 ```
 
-- [ ] **Step 2: Write the README**
+- [x] **Step 2: Write the README**
 
 Document project purpose, assumptions, Stage1–Stage10 status, Docker and local build commands, the four Stage8 input sections, Stage9 TXT/Markdown/CSV outputs, Stage10 fixture names/counts, fixed-capacity limits, and explicit non-goals. Use concrete commands and paths from the repository.
 
-- [ ] **Step 3: Write the project report**
+- [x] **Step 3: Write the project report**
 
 Summarize the FEM theory, module data flow, stage progression, medium/large model verification method, output/Debug verification, Docker evidence, known inherited warnings, and limitations. Do not claim a numerical reference value unless it appears in a test or verification record.
 
-- [ ] **Step 4: Run Docker build and runtime checks**
+- [x] **Step 4: Run Docker build and runtime checks**
 
 Run:
 
@@ -344,7 +344,7 @@ docker run --rm c-fe-stage10-project-organization
 
 Expected: Stage10 runs during the builder phase, build exits 0, runtime exits 0, and the unchanged Stage1 Demo is printed.
 
-- [ ] **Step 5: Commit documentation and Docker integration**
+- [x] **Step 5: Commit documentation and Docker integration**
 
 ```text
 git add Dockerfile README.md docs/project-report.md
@@ -355,11 +355,11 @@ git commit -m "docs: organize stage 10 project and verification"
 
 ## Final review checklist
 
-- [ ] `medium.model` is exactly 6 nodes/8 elements and solves successfully.
-- [ ] `large.model` is exactly 10 nodes/20 elements and solves successfully.
-- [ ] Stage10 exercises input, assembly, solve, postprocess, reactions, equilibrium, and all three exporters.
-- [ ] Stage1–9 regressions and Demo remain passing.
-- [ ] Docker builder runs Stage10 and runtime `CMD ["./fem"]` remains unchanged.
-- [ ] README and `docs/project-report.md` contain no unsupported claims.
-- [ ] No dynamic allocation or unrelated API changes are introduced.
-- [ ] Final static checks and worktree status are clean.
+- [x] `medium.model` is exactly 6 nodes/8 elements and solves successfully.
+- [x] `large.model` is exactly 10 nodes/20 elements and solves successfully.
+- [x] Stage10 exercises input, assembly, solve, postprocess, reactions, equilibrium, and all three exporters.
+- [x] Stage1–9 regressions and Demo remain passing.
+- [x] Docker builder runs Stage10 and runtime `CMD ["./fem"]` remains unchanged.
+- [x] README and `docs/project-report.md` contain no unsupported claims.
+- [x] No dynamic allocation or unrelated API changes are introduced.
+- [x] Final static checks and worktree status are clean.

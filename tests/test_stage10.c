@@ -31,11 +31,11 @@ static void remove_outputs(const char *tag)
     char path[128];
 
     snprintf(path, sizeof(path), "stage10_%s.txt", tag);
-    remove(path);
+    assert(remove(path) == 0);
     snprintf(path, sizeof(path), "stage10_%s.md", tag);
-    remove(path);
+    assert(remove(path) == 0);
     snprintf(path, sizeof(path), "stage10_%s.csv", tag);
-    remove(path);
+    assert(remove(path) == 0);
 }
 
 static void assert_generated_outputs(const char *tag,
