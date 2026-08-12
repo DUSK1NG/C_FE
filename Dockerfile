@@ -50,6 +50,13 @@ RUN ./test_stage9 > stage9.out && \
     grep -F "K_original" stage9.out && \
     grep -F "F_original" stage9.out
 
+RUN gcc -std=c11 -Wall -Wextra -pedantic \
+        tests/test_stage10.c src/fem.c src/solver.c src/reactions.c \
+        src/postprocess.c src/io.c src/output.c \
+        -Iinclude -o test_stage10 -lm
+
+RUN ./test_stage10
+
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
