@@ -51,6 +51,17 @@ static FemStatus validate_nodes_section(const FemModel *model,
     }
 
     dof_count = 2 * model->node_count;
+    for (i = 0; i < model->node_count; ++i) {
+        const Node *node = &model->nodes[i];
+
+        if (node->id <= 0 || !isfinite(node->x) || !isfinite(node->y) ||
+            !isfinite(node->fx) || !isfinite(node->fy) ||
+            (node->fix_x != 0 && node->fix_x != 1) ||
+            (node->fix_y != 0 && node->fix_y != 1)) {
+            return FEM_INVALID_ARGUMENT;
+        }
+    }
+
     for (i = 0; i < dof_count; ++i) {
         if (!isfinite(results->displacement[i])) {
             return FEM_INVALID_ARGUMENT;
@@ -544,9 +555,143 @@ static int write_csv_summary(FILE *file,
                        results->residual_fx, results->residual_fy) < 0;
     }
 
-    return fprintf(file, "SUMMARY,,,,,,,,,,,%.12g,%.12g,%d,%d,,,,\n",
+    return fprintf(file, "SUMMARY,,,,,,,,,,,%.12g,%.12g,,,,,,,%d,%d\n",
                    results->residual_fx, results->residual_fy,
                    model->node_count, model->element_count) < 0;
+}
+
+static FemStatus write_results_txt_legacy(const char *path,
+                                          const FemModel *model,
+                                          const FemResults *results)
+{
+    int constrained[MAX_DOF];
+    FILE *file;
+    int write_failed = 0;
+
+    if (validate_output_selection(path, model, results,
+                                  &(const FemOutputOptions){FEM_OUTPUT_ALL_SECTIONS},
+                                  constrained) != FEM_OK) {
+        return FEM_INVALID_ARGUMENT;
+    }
+
+    file = fopen(path, "wb");
+    if (file == NULL) {
+        return FEM_INPUT_ERROR;
+    }
+
+    if (fprintf(file, "2D Truss FEM Results\n\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_txt_nodes(file, model, results, 1);
+    }
+    if (!write_failed && fprintf(file, "\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_txt_elements(file, model, results);
+    }
+    if (!write_failed && fprintf(file, "\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_txt_reactions(file, model, results, constrained);
+    }
+    if (!write_failed && fprintf(file, "\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_txt_summary(file, model, results, 1);
+    }
+
+    return finish_file(file, write_failed);
+}
+
+static FemStatus write_results_markdown_legacy(const char *path,
+                                               const FemModel *model,
+                                               const FemResults *results)
+{
+    int constrained[MAX_DOF];
+    FILE *file;
+    int write_failed = 0;
+
+    if (validate_output_selection(path, model, results,
+                                  &(const FemOutputOptions){FEM_OUTPUT_ALL_SECTIONS},
+                                  constrained) != FEM_OK) {
+        return FEM_INVALID_ARGUMENT;
+    }
+
+    file = fopen(path, "wb");
+    if (file == NULL) {
+        return FEM_INPUT_ERROR;
+    }
+
+    if (fprintf(file, "# 2D Truss FEM Results\n\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_markdown_nodes(file, model, results, 1);
+    }
+    if (!write_failed && fprintf(file, "\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_markdown_elements(file, model, results);
+    }
+    if (!write_failed && fprintf(file, "\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_markdown_reactions(file, model, results, constrained);
+    }
+    if (!write_failed && fprintf(file, "\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_markdown_summary(file, model, results, 1);
+    }
+
+    return finish_file(file, write_failed);
+}
+
+static FemStatus write_results_csv_legacy(const char *path,
+                                          const FemModel *model,
+                                          const FemResults *results)
+{
+    int constrained[MAX_DOF];
+    FILE *file;
+    int write_failed = 0;
+
+    if (validate_output_selection(path, model, results,
+                                  &(const FemOutputOptions){FEM_OUTPUT_ALL_SECTIONS},
+                                  constrained) != FEM_OK) {
+        return FEM_INVALID_ARGUMENT;
+    }
+
+    file = fopen(path, "wb");
+    if (file == NULL) {
+        return FEM_INPUT_ERROR;
+    }
+
+    if (fprintf(file,
+                "record_type,id,ux,uy,elongation,strain,stress,axial_force,"
+                "state,rx,ry,residual_fx,residual_fy\n") < 0) {
+        write_failed = 1;
+    }
+    if (!write_failed) {
+        write_failed = write_csv_nodes(file, model, results, 1);
+    }
+    if (!write_failed) {
+        write_failed = write_csv_elements(file, model, results, 1);
+    }
+    if (!write_failed) {
+        write_failed = write_csv_reactions(file, model, results, constrained, 1);
+    }
+    if (!write_failed) {
+        write_failed = write_csv_summary(file, model, results, 1);
+    }
+
+    return finish_file(file, write_failed);
 }
 
 FemStatus write_results_txt_selected(const char *path,
@@ -558,14 +703,11 @@ FemStatus write_results_txt_selected(const char *path,
     FILE *file;
     int write_failed = 0;
     int wrote_section = 0;
-    int compatibility_mode;
-
     if (validate_output_selection(path, model, results, options, constrained) !=
         FEM_OK) {
         return FEM_INVALID_ARGUMENT;
     }
 
-    compatibility_mode = options->sections == FEM_OUTPUT_ALL_SECTIONS;
     file = fopen(path, "wb");
     if (file == NULL) {
         return FEM_INPUT_ERROR;
@@ -576,7 +718,7 @@ FemStatus write_results_txt_selected(const char *path,
     }
 
     if (!write_failed && (options->sections & FEM_OUTPUT_NODES) != 0u) {
-        write_failed = write_txt_nodes(file, model, results, compatibility_mode);
+        write_failed = write_txt_nodes(file, model, results, 0);
         wrote_section = 1;
     }
     if (!write_failed && (options->sections & FEM_OUTPUT_ELEMENTS) != 0u) {
@@ -602,8 +744,7 @@ FemStatus write_results_txt_selected(const char *path,
             write_failed = 1;
         }
         if (!write_failed) {
-            write_failed = write_txt_summary(file, model, results,
-                                             compatibility_mode);
+            write_failed = write_txt_summary(file, model, results, 0);
         }
     }
 
@@ -619,14 +760,11 @@ FemStatus write_results_markdown_selected(const char *path,
     FILE *file;
     int write_failed = 0;
     int wrote_section = 0;
-    int compatibility_mode;
-
     if (validate_output_selection(path, model, results, options, constrained) !=
         FEM_OK) {
         return FEM_INVALID_ARGUMENT;
     }
 
-    compatibility_mode = options->sections == FEM_OUTPUT_ALL_SECTIONS;
     file = fopen(path, "wb");
     if (file == NULL) {
         return FEM_INPUT_ERROR;
@@ -637,8 +775,7 @@ FemStatus write_results_markdown_selected(const char *path,
     }
 
     if (!write_failed && (options->sections & FEM_OUTPUT_NODES) != 0u) {
-        write_failed = write_markdown_nodes(file, model, results,
-                                            compatibility_mode);
+        write_failed = write_markdown_nodes(file, model, results, 0);
         wrote_section = 1;
     }
     if (!write_failed && (options->sections & FEM_OUTPUT_ELEMENTS) != 0u) {
@@ -665,8 +802,7 @@ FemStatus write_results_markdown_selected(const char *path,
             write_failed = 1;
         }
         if (!write_failed) {
-            write_failed = write_markdown_summary(file, model, results,
-                                                  compatibility_mode);
+            write_failed = write_markdown_summary(file, model, results, 0);
         }
     }
 
@@ -681,46 +817,35 @@ FemStatus write_results_csv_selected(const char *path,
     int constrained[MAX_DOF];
     FILE *file;
     int write_failed = 0;
-    int compatibility_mode;
-
     if (validate_output_selection(path, model, results, options, constrained) !=
         FEM_OK) {
         return FEM_INVALID_ARGUMENT;
     }
 
-    compatibility_mode = options->sections == FEM_OUTPUT_ALL_SECTIONS;
     file = fopen(path, "wb");
     if (file == NULL) {
         return FEM_INPUT_ERROR;
     }
 
-    if (compatibility_mode) {
-        if (fprintf(file,
-                    "record_type,id,ux,uy,elongation,strain,stress,axial_force,"
-                    "state,rx,ry,residual_fx,residual_fy\n") < 0) {
-            write_failed = 1;
-        }
-    } else if (fprintf(file,
-                       "record_type,id,ux,uy,elongation,strain,stress,axial_force,"
-                       "state,rx,ry,residual_fx,residual_fy,x,y,fx,fy,fix_x,fix_y\n") <
-               0) {
+    if (fprintf(file,
+               "record_type,id,ux,uy,elongation,strain,stress,axial_force,"
+               "state,rx,ry,residual_fx,residual_fy,node_x,node_y,node_fx,node_fy,node_fix_x,node_fix_y,summary_node_count,summary_element_count\n") <
+        0) {
         write_failed = 1;
     }
 
     if (!write_failed && (options->sections & FEM_OUTPUT_NODES) != 0u) {
-        write_failed = write_csv_nodes(file, model, results, compatibility_mode);
+        write_failed = write_csv_nodes(file, model, results, 0);
     }
     if (!write_failed && (options->sections & FEM_OUTPUT_ELEMENTS) != 0u) {
-        write_failed = write_csv_elements(file, model, results,
-                                          compatibility_mode);
+        write_failed = write_csv_elements(file, model, results, 0);
     }
     if (!write_failed && (options->sections & FEM_OUTPUT_REACTIONS) != 0u) {
         write_failed = write_csv_reactions(file, model, results, constrained,
-                                           compatibility_mode);
+                                           0);
     }
     if (!write_failed && (options->sections & FEM_OUTPUT_SUMMARY) != 0u) {
-        write_failed = write_csv_summary(file, model, results,
-                                         compatibility_mode);
+        write_failed = write_csv_summary(file, model, results, 0);
     }
 
     return finish_file(file, write_failed);
@@ -730,27 +855,21 @@ FemStatus write_results_txt(const char *path,
                             const FemModel *model,
                             const FemResults *results)
 {
-    const FemOutputOptions options = {FEM_OUTPUT_ALL_SECTIONS};
-
-    return write_results_txt_selected(path, model, results, &options);
+    return write_results_txt_legacy(path, model, results);
 }
 
 FemStatus write_results_markdown(const char *path,
                                  const FemModel *model,
                                  const FemResults *results)
 {
-    const FemOutputOptions options = {FEM_OUTPUT_ALL_SECTIONS};
-
-    return write_results_markdown_selected(path, model, results, &options);
+    return write_results_markdown_legacy(path, model, results);
 }
 
 FemStatus write_results_csv(const char *path,
                             const FemModel *model,
                             const FemResults *results)
 {
-    const FemOutputOptions options = {FEM_OUTPUT_ALL_SECTIONS};
-
-    return write_results_csv_selected(path, model, results, &options);
+    return write_results_csv_legacy(path, model, results);
 }
 
 void print_debug_matrix(const char *name,

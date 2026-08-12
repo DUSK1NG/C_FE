@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -33,6 +34,21 @@ static void assert_contains(const char *buffer, const char *needle)
 static void assert_not_contains(const char *buffer, const char *needle)
 {
     assert(strstr(buffer, needle) == NULL);
+}
+
+static void assert_selected_writers_reject(const FemModel *model,
+                                           const FemResults *results,
+                                           const FemOutputOptions *options)
+{
+    assert(write_results_txt_selected("selected_invalid.txt", model, results,
+                                      options) == FEM_INVALID_ARGUMENT);
+    assert(write_results_markdown_selected("selected_invalid.md", model, results,
+                                           options) == FEM_INVALID_ARGUMENT);
+    assert(write_results_csv_selected("selected_invalid.csv", model, results,
+                                      options) == FEM_INVALID_ARGUMENT);
+    remove("selected_invalid.txt");
+    remove("selected_invalid.md");
+    remove("selected_invalid.csv");
 }
 
 static void test_selected_sections_and_legacy_wrapper(void)
@@ -87,6 +103,60 @@ static void test_selected_sections_and_legacy_wrapper(void)
     assert(remove(legacy_path) == 0);
 }
 
+static void test_selected_all_sections_use_selected_format(void)
+{
+    FemModel model;
+    FemResults results = {0};
+    FemOutputOptions options;
+    char buffer[32768];
+    const char *selected_txt_path = "selected_all_results.txt";
+    const char *selected_csv_path = "selected_all_results.csv";
+    const char *legacy_txt_path = "legacy_all_results.txt";
+    const char *legacy_csv_path = "legacy_all_results.csv";
+
+    assert(read_model_file("tests/data/medium.model", &model) == FEM_OK);
+    assert(run_fem_analysis(&model, &results) == FEM_OK);
+
+    options.sections = FEM_OUTPUT_NODES | FEM_OUTPUT_ELEMENTS |
+                       FEM_OUTPUT_REACTIONS | FEM_OUTPUT_SUMMARY;
+
+    assert(write_results_txt_selected(selected_txt_path, &model, &results,
+                                      &options) == FEM_OK);
+    assert(read_file(selected_txt_path, buffer, sizeof(buffer)) != 0);
+    assert_contains(buffer, "node_id ux uy x y fx fy fix_x fix_y\n");
+    assert_contains(buffer, "node_count element_count residual_fx residual_fy\n");
+    assert(remove(selected_txt_path) == 0);
+
+    assert(write_results_txt(legacy_txt_path, &model, &results) == FEM_OK);
+    assert(read_file(legacy_txt_path, buffer, sizeof(buffer)) != 0);
+    assert_contains(buffer, "node_id ux uy\n");
+    assert_not_contains(buffer, "node_id ux uy x y fx fy fix_x fix_y\n");
+    assert_contains(buffer, "residual_fx residual_fy\n");
+    assert_not_contains(buffer,
+                        "node_count element_count residual_fx residual_fy\n");
+    assert(remove(legacy_txt_path) == 0);
+
+    assert(write_results_csv_selected(selected_csv_path, &model, &results,
+                                      &options) == FEM_OK);
+    assert(read_file(selected_csv_path, buffer, sizeof(buffer)) != 0);
+    assert_contains(
+        buffer,
+        "record_type,id,ux,uy,elongation,strain,stress,axial_force,state,rx,ry,residual_fx,residual_fy,node_x,node_y,node_fx,node_fy,node_fix_x,node_fix_y,summary_node_count,summary_element_count\n");
+    assert_contains(buffer, "SUMMARY,,,,,,,,,,,");
+    assert_contains(buffer, ",,,6,8\n");
+    assert(remove(selected_csv_path) == 0);
+
+    assert(write_results_csv(legacy_csv_path, &model, &results) == FEM_OK);
+    assert(read_file(legacy_csv_path, buffer, sizeof(buffer)) != 0);
+    assert_contains(
+        buffer,
+        "record_type,id,ux,uy,elongation,strain,stress,axial_force,state,rx,ry,residual_fx,residual_fy\n");
+    assert_not_contains(buffer, "summary_node_count");
+    assert_contains(buffer, "SUMMARY,,,,,,,,,,,");
+    assert_not_contains(buffer, ",,,6,8\n");
+    assert(remove(legacy_csv_path) == 0);
+}
+
 static void test_selected_writer_validation(void)
 {
     FemModel model;
@@ -107,18 +177,37 @@ static void test_selected_writer_validation(void)
                                       NULL) == FEM_INVALID_ARGUMENT);
 
     options.sections = 0u;
-    assert(write_results_txt_selected("selected_invalid.txt", &model, &results,
-                                      &options) == FEM_INVALID_ARGUMENT);
+    assert_selected_writers_reject(&model, &results, &options);
     options.sections = FEM_OUTPUT_NODES | (1u << 7);
-    assert(write_results_txt_selected("selected_invalid.txt", &model, &results,
-                                      &options) == FEM_INVALID_ARGUMENT);
-    remove("selected_invalid.txt");
+    assert_selected_writers_reject(&model, &results, &options);
+}
+
+static void test_selected_node_metadata_validation(void)
+{
+    FemModel model;
+    FemResults results = {0};
+    FemOutputOptions options;
+
+    assert(read_model_file("tests/data/medium.model", &model) == FEM_OK);
+    assert(run_fem_analysis(&model, &results) == FEM_OK);
+
+    options.sections = FEM_OUTPUT_NODES;
+
+    model.nodes[0].x = NAN;
+    assert_selected_writers_reject(&model, &results, &options);
+
+    assert(read_model_file("tests/data/medium.model", &model) == FEM_OK);
+    assert(run_fem_analysis(&model, &results) == FEM_OK);
+    model.nodes[0].fix_y = 2;
+    assert_selected_writers_reject(&model, &results, &options);
 }
 
 int main(void)
 {
     test_selected_sections_and_legacy_wrapper();
+    test_selected_all_sections_use_selected_format();
     test_selected_writer_validation();
+    test_selected_node_metadata_validation();
     puts("Selected output section tests passed.");
     return 0;
 }
