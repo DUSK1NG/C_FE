@@ -28,6 +28,20 @@ static const char *element_state_name(ElementState state)
     }
 }
 
+static const char *element_state_name_bilingual(ElementState state)
+{
+    switch (state) {
+    case ELEMENT_NEUTRAL:
+        return "中性 / NEUTRAL";
+    case ELEMENT_TENSION:
+        return "受拉 / TENSION";
+    case ELEMENT_COMPRESSION:
+        return "受压 / COMPRESSION";
+    default:
+        return NULL;
+    }
+}
+
 static FemStatus validate_model_basics(const char *path, const FemModel *model)
 {
     if (path == NULL || path[0] == '\0' || model == NULL) {
@@ -217,7 +231,9 @@ static int write_txt_nodes(FILE *file,
     int i;
 
     if (compatibility_mode) {
-        if (fprintf(file, "Nodal Displacements\nnode_id ux uy\n") < 0) {
+        if (fprintf(file,
+                    "节点位移 / Nodal Displacements\n"
+                    "节点编号 / Node ID ux uy\n") < 0) {
             return 1;
         }
         for (i = 0; i < model->node_count; ++i) {
@@ -231,8 +247,8 @@ static int write_txt_nodes(FILE *file,
     }
 
     if (fprintf(file,
-                "Nodal Displacements\n"
-                "node_id ux uy x y fx fy fix_x fix_y\n") < 0) {
+                "节点位移 / Nodal Displacements\n"
+                "节点编号 / Node ID ux uy x y fx fy fix_x fix_y\n") < 0) {
         return 1;
     }
     for (i = 0; i < model->node_count; ++i) {
@@ -256,8 +272,9 @@ static int write_txt_elements(FILE *file,
     int i;
 
     if (fprintf(file,
-                "Element Results\n"
-                "element_id elongation strain stress axial_force state\n") < 0) {
+                "单元结果 / Element Results\n"
+                "单元编号 / Element ID 伸长量 / Elongation 应变 / Strain "
+                "应力 / Stress 轴力 / Axial Force 状态 / State\n") < 0) {
         return 1;
     }
     for (i = 0; i < model->element_count; ++i) {
@@ -267,7 +284,7 @@ static int write_txt_elements(FILE *file,
                     model->elements[i].id, element_result->elongation,
                     element_result->strain, element_result->stress,
                     element_result->axial_force,
-                    element_state_name(element_result->state)) < 0) {
+                    element_state_name_bilingual(element_result->state)) < 0) {
             return 1;
         }
     }
@@ -282,7 +299,9 @@ static int write_txt_reactions(FILE *file,
 {
     int i;
 
-    if (fprintf(file, "Support Reactions\nnode_id rx ry\n") < 0) {
+    if (fprintf(file,
+                "支座反力 / Support Reactions\n"
+                "节点编号 / Node ID rx ry\n") < 0) {
         return 1;
     }
     for (i = 0; i < model->node_count; ++i) {
@@ -310,15 +329,16 @@ static int write_txt_summary(FILE *file,
 {
     if (compatibility_mode) {
         return fprintf(file,
-                       "Equilibrium\n"
-                       "residual_fx residual_fy\n"
+                       "平衡检查 / Equilibrium\n"
+                       "残差 Fx / Residual Fx 残差 Fy / Residual Fy\n"
                        "%.12g %.12g\n",
                        results->residual_fx, results->residual_fy) < 0;
     }
 
     return fprintf(file,
-                   "Equilibrium\n"
-                   "node_count element_count residual_fx residual_fy\n"
+                   "平衡检查 / Equilibrium\n"
+                   "节点数 / Node Count 单元数 / Element Count "
+                   "残差 Fx / Residual Fx 残差 Fy / Residual Fy\n"
                    "%d %d %.12g %.12g\n",
                    model->node_count, model->element_count,
                    results->residual_fx, results->residual_fy) < 0;
@@ -333,8 +353,8 @@ static int write_markdown_nodes(FILE *file,
 
     if (compatibility_mode) {
         if (fprintf(file,
-                    "## Nodal Displacements\n"
-                    "| Node ID | ux | uy |\n"
+                    "## 节点位移 / Nodal Displacements\n"
+                    "| 节点编号 / Node ID | ux | uy |\n"
                     "|---:|---:|---:|\n") < 0) {
             return 1;
         }
@@ -349,8 +369,8 @@ static int write_markdown_nodes(FILE *file,
     }
 
     if (fprintf(file,
-                "## Nodal Displacements\n"
-                "| Node ID | ux | uy | x | y | fx | fy | fix_x | fix_y |\n"
+                "## 节点位移 / Nodal Displacements\n"
+                "| 节点编号 / Node ID | ux | uy | x | y | fx | fy | fix_x | fix_y |\n"
                 "|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n") < 0) {
         return 1;
     }
@@ -376,8 +396,9 @@ static int write_markdown_elements(FILE *file,
     int i;
 
     if (fprintf(file,
-                "## Element Results\n"
-                "| Element ID | Elongation | Strain | Stress | Axial Force | State |\n"
+                "## 单元结果 / Element Results\n"
+                "| 单元编号 / Element ID | 伸长量 / Elongation | 应变 / Strain | "
+                "应力 / Stress | 轴力 / Axial Force | 状态 / State |\n"
                 "|---:|---:|---:|---:|---:|---|\n") < 0) {
         return 1;
     }
@@ -388,7 +409,7 @@ static int write_markdown_elements(FILE *file,
                     model->elements[i].id, element_result->elongation,
                     element_result->strain, element_result->stress,
                     element_result->axial_force,
-                    element_state_name(element_result->state)) < 0) {
+                    element_state_name_bilingual(element_result->state)) < 0) {
             return 1;
         }
     }
@@ -404,8 +425,8 @@ static int write_markdown_reactions(FILE *file,
     int i;
 
     if (fprintf(file,
-                "## Support Reactions\n"
-                "| Node ID | rx | ry |\n"
+                "## 支座反力 / Support Reactions\n"
+                "| 节点编号 / Node ID | rx | ry |\n"
                 "|---:|---:|---:|\n") < 0) {
         return 1;
     }
@@ -434,16 +455,17 @@ static int write_markdown_summary(FILE *file,
 {
     if (compatibility_mode) {
         return fprintf(file,
-                       "## Equilibrium\n"
-                       "| Residual Fx | Residual Fy |\n"
+                       "## 平衡检查 / Equilibrium\n"
+                       "| 残差 Fx / Residual Fx | 残差 Fy / Residual Fy |\n"
                        "|---:|---:|\n"
                        "| %.12g | %.12g |\n",
                        results->residual_fx, results->residual_fy) < 0;
     }
 
     return fprintf(file,
-                   "## Equilibrium\n"
-                   "| Node Count | Element Count | Residual Fx | Residual Fy |\n"
+                   "## 平衡检查 / Equilibrium\n"
+                   "| 节点数 / Node Count | 单元数 / Element Count | "
+                   "残差 Fx / Residual Fx | 残差 Fy / Residual Fy |\n"
                    "|---:|---:|---:|---:|\n"
                    "| %d | %d | %.12g | %.12g |\n",
                    model->node_count, model->element_count,
@@ -459,7 +481,7 @@ static int write_csv_nodes(FILE *file,
 
     if (compatibility_mode) {
         for (i = 0; i < model->node_count; ++i) {
-            if (fprintf(file, "NODE,%d,%.12g,%.12g,,,,,,,,,\n",
+            if (fprintf(file, "NODE,%d,%.12g,%.12g,,,,,,,,,,节点,\n",
                         model->nodes[i].id, results->displacement[2 * i],
                         results->displacement[2 * i + 1]) < 0) {
                 return 1;
@@ -472,7 +494,7 @@ static int write_csv_nodes(FILE *file,
         const Node *node = &model->nodes[i];
 
         if (fprintf(file,
-                    "NODE,%d,%.12g,%.12g,,,,,,,,,%.12g,%.12g,%.12g,%.12g,%d,%d\n",
+                    "NODE,%d,%.12g,%.12g,,,,,,,,,,%.12g,%.12g,%.12g,%.12g,%d,%d,,,节点,\n",
                     node->id, results->displacement[2 * i],
                     results->displacement[2 * i + 1], node->x, node->y,
                     node->fx, node->fy, node->fix_x, node->fix_y) < 0) {
@@ -494,19 +516,22 @@ static int write_csv_elements(FILE *file,
         const ElementResult *element_result = &results->element_results[i];
 
         if (compatibility_mode) {
-            if (fprintf(file, "ELEMENT,%d,,,%.12g,%.12g,%.12g,%.12g,%s,,,,\n",
+            if (fprintf(file,
+                        "ELEMENT,%d,,,%.12g,%.12g,%.12g,%.12g,%s,,,,,单元,%s\n",
                         model->elements[i].id, element_result->elongation,
                         element_result->strain, element_result->stress,
                         element_result->axial_force,
-                        element_state_name(element_result->state)) < 0) {
+                        element_state_name(element_result->state),
+                        element_state_name_bilingual(element_result->state)) < 0) {
                 return 1;
             }
         } else if (fprintf(file,
-                           "ELEMENT,%d,,,%.12g,%.12g,%.12g,%.12g,%s,,,,,,,,\n",
+                           "ELEMENT,%d,,,%.12g,%.12g,%.12g,%.12g,%s,,,,,,,,,,,,,单元,%s\n",
                            model->elements[i].id, element_result->elongation,
                            element_result->strain, element_result->stress,
                            element_result->axial_force,
-                           element_state_name(element_result->state)) < 0) {
+                           element_state_name(element_result->state),
+                           element_state_name_bilingual(element_result->state)) < 0) {
             return 1;
         }
     }
@@ -531,11 +556,11 @@ static int write_csv_reactions(FILE *file,
             double ry = constrained[y_dof] != 0 ? results->reactions[y_dof] : 0.0;
 
             if (compatibility_mode) {
-                if (fprintf(file, "REACTION,%d,,,,,,,,%.12g,%.12g,,\n",
+                if (fprintf(file, "REACTION,%d,,,,,,,,%.12g,%.12g,,,支座反力,\n",
                             model->nodes[i].id, rx, ry) < 0) {
                     return 1;
                 }
-            } else if (fprintf(file, "REACTION,%d,,,,,,,,%.12g,%.12g,,,,,,\n",
+            } else if (fprintf(file, "REACTION,%d,,,,,,,,%.12g,%.12g,,,,,,,,,,,支座反力,\n",
                                model->nodes[i].id, rx, ry) < 0) {
                 return 1;
             }
@@ -551,11 +576,11 @@ static int write_csv_summary(FILE *file,
                              int compatibility_mode)
 {
     if (compatibility_mode) {
-        return fprintf(file, "SUMMARY,,,,,,,,,,,%.12g,%.12g\n",
+        return fprintf(file, "SUMMARY,,,,,,,,,,,%.12g,%.12g,平衡检查,\n",
                        results->residual_fx, results->residual_fy) < 0;
     }
 
-    return fprintf(file, "SUMMARY,,,,,,,,,,,%.12g,%.12g,,,,,,,%d,%d\n",
+    return fprintf(file, "SUMMARY,,,,,,,,,,,%.12g,%.12g,,,,,,,%d,%d,平衡检查,\n",
                    results->residual_fx, results->residual_fy,
                    model->node_count, model->element_count) < 0;
 }
@@ -579,7 +604,7 @@ static FemStatus write_results_txt_legacy(const char *path,
         return FEM_INPUT_ERROR;
     }
 
-    if (fprintf(file, "2D Truss FEM Results\n\n") < 0) {
+    if (fprintf(file, "二维桁架有限元计算结果 / 2D Truss FEM Results\n\n") < 0) {
         write_failed = 1;
     }
     if (!write_failed) {
@@ -626,7 +651,7 @@ static FemStatus write_results_markdown_legacy(const char *path,
         return FEM_INPUT_ERROR;
     }
 
-    if (fprintf(file, "# 2D Truss FEM Results\n\n") < 0) {
+    if (fprintf(file, "# 二维桁架有限元计算结果 / 2D Truss FEM Results\n\n") < 0) {
         write_failed = 1;
     }
     if (!write_failed) {
@@ -675,7 +700,7 @@ static FemStatus write_results_csv_legacy(const char *path,
 
     if (fprintf(file,
                 "record_type,id,ux,uy,elongation,strain,stress,axial_force,"
-                "state,rx,ry,residual_fx,residual_fy\n") < 0) {
+                "state,rx,ry,residual_fx,residual_fy,record_label_zh,state_bilingual\n") < 0) {
         write_failed = 1;
     }
     if (!write_failed) {
@@ -713,7 +738,7 @@ FemStatus write_results_txt_selected(const char *path,
         return FEM_INPUT_ERROR;
     }
 
-    if (fprintf(file, "2D Truss FEM Results\n\n") < 0) {
+    if (fprintf(file, "二维桁架有限元计算结果 / 2D Truss FEM Results\n\n") < 0) {
         write_failed = 1;
     }
 
@@ -770,7 +795,7 @@ FemStatus write_results_markdown_selected(const char *path,
         return FEM_INPUT_ERROR;
     }
 
-    if (fprintf(file, "# 2D Truss FEM Results\n\n") < 0) {
+    if (fprintf(file, "# 二维桁架有限元计算结果 / 2D Truss FEM Results\n\n") < 0) {
         write_failed = 1;
     }
 
@@ -829,7 +854,7 @@ FemStatus write_results_csv_selected(const char *path,
 
     if (fprintf(file,
                "record_type,id,ux,uy,elongation,strain,stress,axial_force,"
-               "state,rx,ry,residual_fx,residual_fy,node_x,node_y,node_fx,node_fy,node_fix_x,node_fix_y,summary_node_count,summary_element_count\n") <
+               "state,rx,ry,residual_fx,residual_fy,node_x,node_y,node_fx,node_fy,node_fix_x,node_fix_y,summary_node_count,summary_element_count,record_label_zh,state_bilingual\n") <
         0) {
         write_failed = 1;
     }

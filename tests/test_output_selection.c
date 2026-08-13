@@ -70,6 +70,8 @@ static void test_selected_sections_and_legacy_wrapper(void)
     assert(write_results_txt_selected(txt_path, &model, &results, &options) ==
            FEM_OK);
     assert(read_file(txt_path, buffer, sizeof(buffer)) != 0);
+    assert_contains(buffer, "节点位移 / Nodal Displacements");
+    assert_contains(buffer, "平衡检查 / Equilibrium");
     assert_contains(buffer, "Nodal Displacements");
     assert_contains(buffer, "Equilibrium");
     assert_not_contains(buffer, "Element Results");
@@ -79,8 +81,10 @@ static void test_selected_sections_and_legacy_wrapper(void)
     assert(write_results_markdown_selected(markdown_path, &model, &results,
                                            &options) == FEM_OK);
     assert(read_file(markdown_path, buffer, sizeof(buffer)) != 0);
-    assert_contains(buffer, "## Nodal Displacements");
-    assert_contains(buffer, "## Equilibrium");
+    assert_contains(buffer, "## 节点位移 / Nodal Displacements");
+    assert_contains(buffer, "## 平衡检查 / Equilibrium");
+    assert_contains(buffer, "## 节点位移 / Nodal Displacements");
+    assert_contains(buffer, "## 平衡检查 / Equilibrium");
     assert_not_contains(buffer, "## Element Results");
     assert_not_contains(buffer, "## Support Reactions");
     assert(remove(markdown_path) == 0);
@@ -125,17 +129,23 @@ static void test_selected_all_sections_use_selected_format(void)
     assert(write_results_txt_selected(selected_txt_path, &model, &results,
                                       &options) == FEM_OK);
     assert(read_file(selected_txt_path, buffer, sizeof(buffer)) != 0);
-    assert_contains(buffer, "node_id ux uy x y fx fy fix_x fix_y\n");
-    assert_contains(buffer, "node_count element_count residual_fx residual_fy\n");
+    assert_contains(buffer,
+                    "节点编号 / Node ID ux uy x y fx fy fix_x fix_y\n");
+    assert_contains(buffer,
+                    "节点数 / Node Count 单元数 / Element Count "
+                    "残差 Fx / Residual Fx 残差 Fy / Residual Fy\n");
     assert(remove(selected_txt_path) == 0);
 
     assert(write_results_txt(legacy_txt_path, &model, &results) == FEM_OK);
     assert(read_file(legacy_txt_path, buffer, sizeof(buffer)) != 0);
-    assert_contains(buffer, "node_id ux uy\n");
-    assert_not_contains(buffer, "node_id ux uy x y fx fy fix_x fix_y\n");
-    assert_contains(buffer, "residual_fx residual_fy\n");
+    assert_contains(buffer, "节点编号 / Node ID ux uy\n");
     assert_not_contains(buffer,
-                        "node_count element_count residual_fx residual_fy\n");
+                        "节点编号 / Node ID ux uy x y fx fy fix_x fix_y\n");
+    assert_contains(buffer,
+                    "残差 Fx / Residual Fx 残差 Fy / Residual Fy\n");
+    assert_not_contains(buffer,
+                        "节点数 / Node Count 单元数 / Element Count "
+                        "残差 Fx / Residual Fx 残差 Fy / Residual Fy\n");
     assert(remove(legacy_txt_path) == 0);
 
     assert(write_results_markdown_selected(selected_markdown_path, &model,
@@ -143,23 +153,26 @@ static void test_selected_all_sections_use_selected_format(void)
     assert(read_file(selected_markdown_path, buffer, sizeof(buffer)) != 0);
     assert_contains(
         buffer,
-        "| Node ID | ux | uy | x | y | fx | fy | fix_x | fix_y |\n");
+        "| 节点编号 / Node ID | ux | uy | x | y | fx | fy | fix_x | fix_y |\n");
     assert_contains(
         buffer,
-        "| Node Count | Element Count | Residual Fx | Residual Fy |\n");
+        "| 节点数 / Node Count | 单元数 / Element Count | "
+        "残差 Fx / Residual Fx | 残差 Fy / Residual Fy |\n");
     assert(remove(selected_markdown_path) == 0);
 
     assert(write_results_markdown(legacy_markdown_path, &model, &results) ==
            FEM_OK);
     assert(read_file(legacy_markdown_path, buffer, sizeof(buffer)) != 0);
-    assert_contains(buffer, "| Node ID | ux | uy |\n");
+    assert_contains(buffer, "| 节点编号 / Node ID | ux | uy |\n");
     assert_not_contains(
         buffer,
-        "| Node ID | ux | uy | x | y | fx | fy | fix_x | fix_y |\n");
-    assert_contains(buffer, "| Residual Fx | Residual Fy |\n");
+        "| 节点编号 / Node ID | ux | uy | x | y | fx | fy | fix_x | fix_y |\n");
+    assert_contains(buffer,
+                    "| 残差 Fx / Residual Fx | 残差 Fy / Residual Fy |\n");
     assert_not_contains(
         buffer,
-        "| Node Count | Element Count | Residual Fx | Residual Fy |\n");
+        "| 节点数 / Node Count | 单元数 / Element Count | "
+        "残差 Fx / Residual Fx | 残差 Fy / Residual Fy |\n");
     assert(remove(legacy_markdown_path) == 0);
 
     assert(write_results_csv_selected(selected_csv_path, &model, &results,
@@ -167,16 +180,16 @@ static void test_selected_all_sections_use_selected_format(void)
     assert(read_file(selected_csv_path, buffer, sizeof(buffer)) != 0);
     assert_contains(
         buffer,
-        "record_type,id,ux,uy,elongation,strain,stress,axial_force,state,rx,ry,residual_fx,residual_fy,node_x,node_y,node_fx,node_fy,node_fix_x,node_fix_y,summary_node_count,summary_element_count\n");
+        "record_type,id,ux,uy,elongation,strain,stress,axial_force,state,rx,ry,residual_fx,residual_fy,node_x,node_y,node_fx,node_fy,node_fix_x,node_fix_y,summary_node_count,summary_element_count,record_label_zh,state_bilingual\n");
     assert_contains(buffer, "SUMMARY,,,,,,,,,,,");
-    assert_contains(buffer, ",,,6,8\n");
+    assert_contains(buffer, ",,,6,8,平衡检查,\n");
     assert(remove(selected_csv_path) == 0);
 
     assert(write_results_csv(legacy_csv_path, &model, &results) == FEM_OK);
     assert(read_file(legacy_csv_path, buffer, sizeof(buffer)) != 0);
     assert_contains(
         buffer,
-        "record_type,id,ux,uy,elongation,strain,stress,axial_force,state,rx,ry,residual_fx,residual_fy\n");
+        "record_type,id,ux,uy,elongation,strain,stress,axial_force,state,rx,ry,residual_fx,residual_fy,record_label_zh,state_bilingual\n");
     assert_not_contains(buffer, "summary_node_count");
     assert_contains(buffer, "SUMMARY,,,,,,,,,,,");
     assert_not_contains(buffer, ",,,6,8\n");

@@ -40,6 +40,8 @@ medium.md
 medium.csv
 ```
 
+TXT 和 Markdown 使用中英文双语标题、字段名和单元状态；CSV 保留原有英文机器字段，并在末尾追加 `record_label_zh` 与 `state_bilingual`，便于程序读取和人工查看。
+
 ## 本地网页编辑器
 
 直接打开 [`web/index.html`](web/index.html)，无需安装 Docker、Node.js、npm 或启动服务器。

@@ -90,23 +90,28 @@ static void test_txt_contract(void)
     char buffer[8192];
     const char *path = "stage9_results.txt";
     const char *expected =
-        "2D Truss FEM Results\n\n"
-        "Nodal Displacements\n"
-        "node_id ux uy\n"
+        "二维桁架有限元计算结果 / 2D Truss FEM Results\n\n"
+        "节点位移 / Nodal Displacements\n"
+        "节点编号 / Node ID ux uy\n"
         "10 0 0\n"
         "40 0.125 0.25\n\n"
-        "Element Results\n"
-        "element_id elongation strain stress axial_force state\n"
-        "7 0.275 0.055 11 22 TENSION\n\n"
-        "Support Reactions\n"
-        "node_id rx ry\n"
+        "单元结果 / Element Results\n"
+        "单元编号 / Element ID 伸长量 / Elongation 应变 / Strain "
+        "应力 / Stress 轴力 / Axial Force 状态 / State\n"
+        "7 0.275 0.055 11 22 受拉 / TENSION\n\n"
+        "支座反力 / Support Reactions\n"
+        "节点编号 / Node ID rx ry\n"
         "10 12.5 -6.25\n\n"
-        "Equilibrium\n"
-        "residual_fx residual_fy\n"
+        "平衡检查 / Equilibrium\n"
+        "残差 Fx / Residual Fx 残差 Fy / Residual Fy\n"
         "1.5e-09 -2.5e-09\n";
 
     build_fixture(&model, &results);
     assert(write_results_txt(path, &model, &results) == FEM_OK);
+    assert(read_file(path, buffer, sizeof(buffer)) != 0);
+    assert(strstr(buffer, "二维桁架有限元计算结果 / 2D Truss FEM Results") != NULL);
+    assert(strstr(buffer, "节点位移 / Nodal Displacements") != NULL);
+    assert(strstr(buffer, "受拉 / TENSION") != NULL);
     assert(read_file(path, buffer, sizeof(buffer)) != 0);
     assert(strcmp(buffer, expected) == 0);
     assert(remove(path) == 0);
@@ -119,27 +124,32 @@ static void test_markdown_contract(void)
     char buffer[8192];
     const char *path = "stage9_results.md";
     const char *expected =
-        "# 2D Truss FEM Results\n\n"
-        "## Nodal Displacements\n"
-        "| Node ID | ux | uy |\n"
+        "# 二维桁架有限元计算结果 / 2D Truss FEM Results\n\n"
+        "## 节点位移 / Nodal Displacements\n"
+        "| 节点编号 / Node ID | ux | uy |\n"
         "|---:|---:|---:|\n"
         "| 10 | 0 | 0 |\n"
         "| 40 | 0.125 | 0.25 |\n\n"
-        "## Element Results\n"
-        "| Element ID | Elongation | Strain | Stress | Axial Force | State |\n"
+        "## 单元结果 / Element Results\n"
+        "| 单元编号 / Element ID | 伸长量 / Elongation | 应变 / Strain | "
+        "应力 / Stress | 轴力 / Axial Force | 状态 / State |\n"
         "|---:|---:|---:|---:|---:|---|\n"
-        "| 7 | 0.275 | 0.055 | 11 | 22 | TENSION |\n\n"
-        "## Support Reactions\n"
-        "| Node ID | rx | ry |\n"
+        "| 7 | 0.275 | 0.055 | 11 | 22 | 受拉 / TENSION |\n\n"
+        "## 支座反力 / Support Reactions\n"
+        "| 节点编号 / Node ID | rx | ry |\n"
         "|---:|---:|---:|\n"
         "| 10 | 12.5 | -6.25 |\n\n"
-        "## Equilibrium\n"
-        "| Residual Fx | Residual Fy |\n"
+        "## 平衡检查 / Equilibrium\n"
+        "| 残差 Fx / Residual Fx | 残差 Fy / Residual Fy |\n"
         "|---:|---:|\n"
         "| 1.5e-09 | -2.5e-09 |\n";
 
     build_fixture(&model, &results);
     assert(write_results_markdown(path, &model, &results) == FEM_OK);
+    assert(read_file(path, buffer, sizeof(buffer)) != 0);
+    assert(strstr(buffer, "# 二维桁架有限元计算结果 / 2D Truss FEM Results") != NULL);
+    assert(strstr(buffer, "## 节点位移 / Nodal Displacements") != NULL);
+    assert(strstr(buffer, "受拉 / TENSION") != NULL);
     assert(read_file(path, buffer, sizeof(buffer)) != 0);
     assert(strcmp(buffer, expected) == 0);
     assert(remove(path) == 0);
@@ -152,16 +162,20 @@ static void test_csv_contract(void)
     char buffer[8192];
     const char *path = "stage9_results.csv";
     const char *expected =
-        "record_type,id,ux,uy,elongation,strain,stress,axial_force,state,rx,ry,residual_fx,residual_fy\n"
-        "NODE,10,0,0,,,,,,,,,\n"
-        "NODE,40,0.125,0.25,,,,,,,,,\n"
-        "ELEMENT,7,,,0.275,0.055,11,22,TENSION,,,,\n"
-        "REACTION,10,,,,,,,,12.5,-6.25,,\n"
-        "SUMMARY,,,,,,,,,,,1.5e-09,-2.5e-09\n";
+        "record_type,id,ux,uy,elongation,strain,stress,axial_force,state,rx,ry,residual_fx,residual_fy,record_label_zh,state_bilingual\n"
+        "NODE,10,0,0,,,,,,,,,,节点,\n"
+        "NODE,40,0.125,0.25,,,,,,,,,,节点,\n"
+        "ELEMENT,7,,,0.275,0.055,11,22,TENSION,,,,,单元,受拉 / TENSION\n"
+        "REACTION,10,,,,,,,,12.5,-6.25,,,支座反力,\n"
+        "SUMMARY,,,,,,,,,,,1.5e-09,-2.5e-09,平衡检查,\n";
 
     build_fixture(&model, &results);
     assert(write_results_csv(path, &model, &results) == FEM_OK);
     assert(read_file(path, buffer, sizeof(buffer)) != 0);
+    assert(strstr(buffer, "record_label_zh") != NULL);
+    assert(strstr(buffer, "state_bilingual") != NULL);
+    assert(strstr(buffer, "ELEMENT,7") != NULL);
+    assert(strstr(buffer, ",单元,受拉 / TENSION\n") != NULL);
     assert(strcmp(buffer, expected) == 0);
     assert(remove(path) == 0);
 }
@@ -179,7 +193,11 @@ static void test_element_state_strings(void)
         ELEMENT_TENSION,
         ELEMENT_COMPRESSION
     };
-    const char *names[] = {"NEUTRAL", "TENSION", "COMPRESSION"};
+    const char *names[] = {
+        "中性 / NEUTRAL",
+        "受拉 / TENSION",
+        "受压 / COMPRESSION"
+    };
     size_t i;
 
     for (i = 0; i < sizeof(states) / sizeof(states[0]); ++i) {
@@ -230,8 +248,9 @@ static void test_one_axis_reaction_outputs(void)
 
     assert(write_results_csv(csv_path, &model, &results) == FEM_OK);
     assert(read_file(csv_path, buffer, sizeof(buffer)) != 0);
-    assert(strstr(buffer, "REACTION,10,,,,,,,,12.5,0,,\n") != NULL);
-    assert(strstr(buffer, "REACTION,10,,,,,,,,12.5,-6.25,,\n") == NULL);
+    assert(strstr(buffer, "REACTION,10,,,,,,,,12.5,0,,,支座反力,\n") != NULL);
+    assert(strstr(buffer,
+                  "REACTION,10,,,,,,,,12.5,-6.25,,,支座反力,\n") == NULL);
     assert(remove(csv_path) == 0);
 }
 
@@ -262,8 +281,9 @@ static void test_y_axis_reaction_outputs(void)
 
     assert(write_results_csv(csv_path, &model, &results) == FEM_OK);
     assert(read_file(csv_path, buffer, sizeof(buffer)) != 0);
-    assert(strstr(buffer, "REACTION,10,,,,,,,,0,-6.25,,\n") != NULL);
-    assert(strstr(buffer, "REACTION,10,,,,,,,,12.5,-6.25,,\n") == NULL);
+    assert(strstr(buffer, "REACTION,10,,,,,,,,0,-6.25,,,支座反力,\n") != NULL);
+    assert(strstr(buffer,
+                  "REACTION,10,,,,,,,,12.5,-6.25,,,支座反力,\n") == NULL);
     assert(remove(csv_path) == 0);
 }
 
