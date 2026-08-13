@@ -5,6 +5,7 @@ const path = require('node:path');
 const {
   buildCommand,
   createEmptyModel,
+  analyzeModel,
   parseModel,
   validateModel,
   serializeModel,
@@ -428,6 +429,41 @@ const triangleParsed = parseModel(triangleSource);
 assert.equal(triangleParsed.ok, true, triangleParsed.error);
 assert.equal(triangleParsed.model.nodes.length, 3);
 assert.equal(triangleParsed.model.elements.length, 3);
+
+const analyzed = analyzeModel(parsed.model);
+assert.equal(analyzed.ok, true);
+assert.equal(analyzed.results.nodeDisplacements.length, 2);
+assert.equal(analyzed.results.elementResults.length, 1);
+assert.equal(analyzed.results.reactions.length, 1);
+assert.ok(Number.isFinite(analyzed.results.nodeDisplacements[1].uy));
+assert.ok(Number.isFinite(analyzed.results.elementResults[0].stress));
+assert.ok(Math.abs(analyzed.results.summary.residualY) < 1e-7);
+
+const analyzedTriangle = analyzeModel(triangleParsed.model);
+assert.equal(analyzedTriangle.ok, true, analyzedTriangle.error);
+assert.equal(analyzedTriangle.results.nodeDisplacements.length, 3);
+assert.equal(analyzedTriangle.results.elementResults.length, 3);
+
+const zeroLengthAnalysis = analyzeModel({
+  ...makeValidModel(),
+  nodes: [
+    { id: 1, x: 0, y: 0 },
+    { id: 2, x: 0, y: 0 },
+  ],
+});
+assert.equal(zeroLengthAnalysis.ok, false);
+assert.equal(typeof zeroLengthAnalysis.error, 'string');
+assert.ok(zeroLengthAnalysis.error.length > 0);
+assert.equal('results' in zeroLengthAnalysis, false);
+
+const insufficientConstraintAnalysis = analyzeModel({
+  ...makeValidModel(),
+  constraints: [{ node: 1, fix_x: 1, fix_y: 1 }],
+});
+assert.equal(insufficientConstraintAnalysis.ok, false);
+assert.equal(typeof insufficientConstraintAnalysis.error, 'string');
+assert.ok(insufficientConstraintAnalysis.error.length > 0);
+assert.equal('results' in insufficientConstraintAnalysis, false);
 assert.equal(triangleParsed.model.loads.length, 1);
 assert.equal(triangleParsed.model.constraints.length, 3);
 const triangleRoundTrip = parseModel(serializeModel(triangleParsed.model));

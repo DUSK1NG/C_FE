@@ -453,6 +453,200 @@ function serializeModel(model) {
   return lines.join('\n');
 }
 
+function createSquareMatrix(size) {
+  return Array.from({ length: size }, () => Array(size).fill(0));
+}
+
+function solveLinearSystem(matrix, vector) {
+  const size = vector.length;
+  const augmented = matrix.map((row, index) => [...row, vector[index]]);
+  const largestEntry = augmented.reduce(
+    (largest, row) => Math.max(largest, ...row.map((value) => Math.abs(value))),
+    0
+  );
+  const pivotTolerance = Math.max(1, largestEntry) * Number.EPSILON * Math.max(1, size);
+
+  for (let column = 0; column < size; column += 1) {
+    let pivotRow = column;
+    for (let row = column + 1; row < size; row += 1) {
+      if (Math.abs(augmented[row][column]) > Math.abs(augmented[pivotRow][column])) {
+        pivotRow = row;
+      }
+    }
+
+    const pivot = augmented[pivotRow][column];
+    if (!Number.isFinite(pivot) || Math.abs(pivot) <= pivotTolerance) {
+      throw new Error('Model stiffness matrix is singular or the structure is a mechanism');
+    }
+
+    [augmented[column], augmented[pivotRow]] = [augmented[pivotRow], augmented[column]];
+    for (let index = column; index <= size; index += 1) {
+      augmented[column][index] /= pivot;
+    }
+
+    for (let row = 0; row < size; row += 1) {
+      if (row === column) {
+        continue;
+      }
+      const factor = augmented[row][column];
+      for (let index = column; index <= size; index += 1) {
+        augmented[row][index] -= factor * augmented[column][index];
+      }
+    }
+  }
+
+  const solution = augmented.map((row) => row[size]);
+  if (!solution.every(Number.isFinite)) {
+    throw new Error('Model solution contains non-finite values');
+  }
+  return solution;
+}
+
+function analyzeModel(model) {
+  const validation = validateModel(model);
+  if (!validation.valid) {
+    return { ok: false, error: validation.errors.join('; ') };
+  }
+
+  try {
+    const nodeIndexById = new Map(model.nodes.map((node, index) => [node.id, index]));
+    const degreeCount = model.nodes.length * 2;
+    const stiffness = createSquareMatrix(degreeCount);
+    const loads = Array(degreeCount).fill(0);
+    const constrained = Array(degreeCount).fill(false);
+    const elementGeometry = [];
+
+    for (const element of model.elements) {
+      const firstIndex = nodeIndexById.get(element.node1);
+      const secondIndex = nodeIndexById.get(element.node2);
+      const firstNode = model.nodes[firstIndex];
+      const secondNode = model.nodes[secondIndex];
+      const dx = secondNode.x - firstNode.x;
+      const dy = secondNode.y - firstNode.y;
+      const length = Math.hypot(dx, dy);
+      if (!Number.isFinite(length) || length === 0) {
+        throw new Error(`Element ${element.id} has zero or non-finite length`);
+      }
+
+      const c = dx / length;
+      const s = dy / length;
+      const factor = (element.E * element.A) / length;
+      if (![c, s, factor].every(Number.isFinite)) {
+        throw new Error(`Element ${element.id} has non-finite stiffness`);
+      }
+
+      const cc = factor * c * c;
+      const ss = factor * s * s;
+      const cs = factor * c * s;
+      const elementStiffness = [
+        [cc, cs, -cc, -cs],
+        [cs, ss, -cs, -ss],
+        [-cc, -cs, cc, cs],
+        [-cs, -ss, cs, ss],
+      ];
+      const dofs = [firstIndex * 2, firstIndex * 2 + 1, secondIndex * 2, secondIndex * 2 + 1];
+      for (let row = 0; row < dofs.length; row += 1) {
+        for (let column = 0; column < dofs.length; column += 1) {
+          stiffness[dofs[row]][dofs[column]] += elementStiffness[row][column];
+        }
+      }
+      elementGeometry.push({ element, firstIndex, secondIndex, length, c, s });
+    }
+
+    for (const load of model.loads) {
+      const nodeIndex = nodeIndexById.get(load.node);
+      loads[nodeIndex * 2] += load.fx;
+      loads[nodeIndex * 2 + 1] += load.fy;
+    }
+    for (const constraint of model.constraints) {
+      const nodeIndex = nodeIndexById.get(constraint.node);
+      constrained[nodeIndex * 2] = constraint.fix_x === 1;
+      constrained[nodeIndex * 2 + 1] = constraint.fix_y === 1;
+    }
+
+    const freeDofs = [];
+    for (let dof = 0; dof < degreeCount; dof += 1) {
+      if (!constrained[dof]) {
+        freeDofs.push(dof);
+      }
+    }
+
+    const displacements = Array(degreeCount).fill(0);
+    if (freeDofs.length > 0) {
+      const reducedStiffness = freeDofs.map((row) => freeDofs.map((column) => stiffness[row][column]));
+      const reducedLoads = freeDofs.map((dof) => loads[dof]);
+      const freeDisplacements = solveLinearSystem(reducedStiffness, reducedLoads);
+      for (let index = 0; index < freeDofs.length; index += 1) {
+        displacements[freeDofs[index]] = freeDisplacements[index];
+      }
+    }
+
+    const internalForces = stiffness.map((row) =>
+      row.reduce((total, value, column) => total + value * displacements[column], 0)
+    );
+    const reactionsByDof = internalForces.map((force, dof) => force - loads[dof]);
+    const nodeDisplacements = model.nodes.map((node, index) => {
+      const ux = displacements[index * 2];
+      const uy = displacements[index * 2 + 1];
+      return { node: node.id, ux, uy, magnitude: Math.hypot(ux, uy) };
+    });
+    const elementResults = elementGeometry.map(({ element, firstIndex, secondIndex, length, c, s }) => {
+      const elongation =
+        c * (displacements[secondIndex * 2] - displacements[firstIndex * 2]) +
+        s * (displacements[secondIndex * 2 + 1] - displacements[firstIndex * 2 + 1]);
+      const strain = elongation / length;
+      const stress = element.E * strain;
+      const axialForce = stress * element.A;
+      return {
+        element: element.id,
+        length,
+        elongation,
+        strain,
+        stress,
+        axialForce,
+        status: axialForce > 0 ? 'tension' : axialForce < 0 ? 'compression' : 'zero',
+      };
+    });
+    const reactions = model.nodes.flatMap((node, index) => {
+      const fx = constrained[index * 2] ? reactionsByDof[index * 2] : 0;
+      const fy = constrained[index * 2 + 1] ? reactionsByDof[index * 2 + 1] : 0;
+      return fx === 0 && fy === 0 ? [] : [{ node: node.id, fx, fy }];
+    });
+    const totalLoadX = model.loads.reduce((total, load) => total + load.fx, 0);
+    const totalLoadY = model.loads.reduce((total, load) => total + load.fy, 0);
+    const totalReactionX = reactions.reduce((total, reaction) => total + reaction.fx, 0);
+    const totalReactionY = reactions.reduce((total, reaction) => total + reaction.fy, 0);
+    const summary = {
+      totalLoadX,
+      totalLoadY,
+      totalReactionX,
+      totalReactionY,
+      residualX: totalLoadX + totalReactionX,
+      residualY: totalLoadY + totalReactionY,
+      maxDisplacement: Math.max(...nodeDisplacements.map((node) => node.magnitude)),
+    };
+    const numericResults = [
+      ...nodeDisplacements.flatMap((node) => [node.ux, node.uy, node.magnitude]),
+      ...elementResults.flatMap((element) => [
+        element.length,
+        element.elongation,
+        element.strain,
+        element.stress,
+        element.axialForce,
+      ]),
+      ...reactions.flatMap((reaction) => [reaction.fx, reaction.fy]),
+      ...Object.values(summary),
+    ];
+    if (!numericResults.every(Number.isFinite)) {
+      throw new Error('Analysis produced incomplete or non-finite results');
+    }
+
+    return { ok: true, results: { nodeDisplacements, elementResults, reactions, summary } };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function quotePowerShellArgument(value) {
   const text = String(value);
   return `'${text.split("'").join("''")}'`;
@@ -1055,6 +1249,7 @@ if (typeof module !== 'undefined' && module.exports) {
     parseModel,
     validateModel,
     serializeModel,
+    analyzeModel,
     buildCommand,
   };
 }
