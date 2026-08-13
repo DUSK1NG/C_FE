@@ -3,6 +3,7 @@ const MAX_NODES = 10;
 const MAX_ELEMENTS = 20;
 const MAX_LOADS = 10;
 const MAX_CONSTRAINTS = 10;
+const MINIMUM_DEFORMATION_DISPLAY_SPAN = 0.0001;
 
 function createEmptyModel() {
   return {
@@ -881,18 +882,21 @@ function renderDeformationSvg(model, results) {
   if (!Number.isFinite(span) || span <= 0) {
     return renderEmptySvg('analysis-svg deformation-svg', '暂无可显示的变形结果');
   }
+  const requestedDisplayScale = Math.max(1, MINIMUM_DEFORMATION_DISPLAY_SPAN / span);
+  const displayScale = Number.isFinite(requestedDisplayScale) ? requestedDisplayScale : 1;
+  const displaySpan = Math.max(span * displayScale, MINIMUM_DEFORMATION_DISPLAY_SPAN);
   const normalizedNodes = nodes.map((node) => ({
     ...node,
-    x: node.x - minX,
-    y: node.y - minY,
+    x: (node.x - minX) * displayScale,
+    y: (node.y - minY) * displayScale,
   }));
-  const padding = span * 0.14;
+  const padding = displaySpan * 0.14;
   const displacementByNode = new Map(
     displacements.map((result) => [
       result?.node,
       {
-        ux: Number.isFinite(result?.ux) ? result.ux : 0,
-        uy: Number.isFinite(result?.uy) ? result.uy : 0,
+        ux: Number.isFinite(result?.ux) ? result.ux * displayScale : 0,
+        uy: Number.isFinite(result?.uy) ? result.uy * displayScale : 0,
       },
     ])
   );
@@ -903,7 +907,7 @@ function renderDeformationSvg(model, results) {
     )
   );
   const deformationScale = maximumDisplacement > 0 && Number.isFinite(maximumDisplacement)
-    ? (span * 0.12) / maximumDisplacement
+    ? (displaySpan * 0.12) / maximumDisplacement
     : 1;
   const nodeById = new Map(normalizedNodes.map((node) => [node.id, node]));
   const renderedElements = elements
@@ -935,16 +939,16 @@ function renderDeformationSvg(model, results) {
       const y = node.y + displacement.uy * deformationScale;
       return (
         `<circle class="deformation-node" data-node="${escapeHtml(node.id)}" ` +
-        `cx="${formatSvgNumber(x)}" cy="${formatSvgNumber(y)}" r="${formatSvgNumber(span * 0.018)}">` +
+        `cx="${formatSvgNumber(x)}" cy="${formatSvgNumber(y)}" r="${formatSvgNumber(displaySpan * 0.018)}">` +
         `<title>节点 ${escapeHtml(node.id)}</title></circle>`
       );
     })
     .join('');
-  const legendX = span * 0.04;
-  const legendY = span * 0.08;
-  const legendLength = span * 0.12;
-  const legendLabelOffset = span * 0.02;
-  const legendLineGap = span * 0.08;
+  const legendX = displaySpan * 0.04;
+  const legendY = displaySpan * 0.08;
+  const legendLength = displaySpan * 0.12;
+  const legendLabelOffset = displaySpan * 0.02;
+  const legendLineGap = displaySpan * 0.08;
   const legend =
     `<g class="svg-legend"><line class="deformation-original" x1="${formatSvgNumber(legendX)}" ` +
     `y1="${formatSvgNumber(legendY)}" x2="${formatSvgNumber(legendX + legendLength)}" y2="${formatSvgNumber(legendY)}" />` +
@@ -955,7 +959,7 @@ function renderDeformationSvg(model, results) {
 
   return (
     `<svg class="analysis-svg deformation-svg" viewBox="${formatSvgNumber(-padding)} ${formatSvgNumber(-padding)} ` +
-    `${formatSvgNumber(span + padding * 2)} ${formatSvgNumber(span + padding * 2)}" role="img" aria-label="节点与杆件变形图" ` +
+    `${formatSvgNumber(displaySpan + padding * 2)} ${formatSvgNumber(displaySpan + padding * 2)}" role="img" aria-label="节点与杆件变形图" ` +
     'xmlns="http://www.w3.org/2000/svg">' +
     legend +
     renderedElements +

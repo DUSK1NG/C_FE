@@ -516,6 +516,39 @@ assert.match(offsetDeformationSvg, /原始形状/);
 assert.match(offsetDeformationSvg, /变形后形状/);
 assert.doesNotMatch(offsetDeformationSvg, /(?:NaN|Infinity)/);
 
+const tinySpanModel = {
+  nodes: [
+    { id: 1, x: 0, y: 0 },
+    { id: 2, x: 1e-12, y: 0 },
+    { id: 3, x: 0, y: 1e-12 },
+  ],
+  elements: [
+    { id: 1, node1: 1, node2: 2, E: 210000, A: 100 },
+    { id: 2, node1: 1, node2: 3, E: 210000, A: 100 },
+    { id: 3, node1: 2, node2: 3, E: 210000, A: 100 },
+  ],
+  loads: [],
+  constraints: [
+    { node: 1, fix_x: 1, fix_y: 1 },
+    { node: 2, fix_x: 0, fix_y: 1 },
+  ],
+};
+assert.equal(validateModel(tinySpanModel).valid, true);
+const tinySpanSvg = renderDeformationSvg(tinySpanModel, {
+  nodeDisplacements: tinySpanModel.nodes.map((node) => ({
+    node: node.id,
+    ux: 0,
+    uy: 0,
+    magnitude: 0,
+  })),
+});
+const tinySpanViewBox = tinySpanSvg.match(/viewBox="([^"]+)"/)[1].split(' ').map(Number);
+assert.ok(tinySpanViewBox[2] > 0 && Number.isFinite(tinySpanViewBox[2]));
+assert.ok(tinySpanViewBox[3] > 0 && Number.isFinite(tinySpanViewBox[3]));
+assert.match(tinySpanSvg, /data-node/);
+assert.match(tinySpanSvg, /原始形状/);
+assert.doesNotMatch(tinySpanSvg, /(?:NaN|Infinity)/);
+
 const emptyAxialForceSvg = renderAxialForceSvg({ elementResults: [] });
 assert.match(emptyAxialForceSvg, /svg-empty-state/);
 assert.doesNotMatch(emptyAxialForceSvg, /(?:NaN|Infinity)/);
