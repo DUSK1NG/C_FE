@@ -133,6 +133,20 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  align-items: center;
+}
+
+.toolbar-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: min(100%, 16rem);
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.toolbar-field span {
+  color: var(--text-main);
 }
 
 .status-grid {
@@ -242,6 +256,10 @@ select {
   background: #fff;
   color: var(--text-main);
   padding: 0.55rem 0.7rem;
+}
+
+.row-action {
+  min-width: 4.5rem;
 }
 
 .placeholder-cell {

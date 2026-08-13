@@ -393,46 +393,129 @@ function buildCommand(fileName) {
   return `fem --input ${quotePowerShellArgument(fileName)}`;
 }
 
-const SHELL_SECTION_CONFIG = [
+const SAMPLE_MODEL_TEXT = `# Reference three-bar truss
+
+NODES 3
+1 0 0
+2 1000 0
+3 500 800
+
+ELEMENTS 3
+1 1 2 210000 100
+2 1 3 210000 100
+3 2 3 210000 100
+
+LOADS 1
+3 0 -10000
+
+CONSTRAINTS 3
+1 1 1
+2 0 1
+3 0 0
+`;
+
+const BROWSER_SECTION_CONFIG = [
   {
     key: 'nodes',
     rowsId: 'nodes-rows',
-    title: '节点',
     columnCount: 4,
-    placeholder: '页面外壳已就绪，节点编辑会在后续任务中接入。',
+    placeholder: '暂无节点，点击“新增节点”开始编辑。',
+    fields: [
+      { key: 'id', inputType: 'number', valueType: 'integer' },
+      { key: 'x', inputType: 'number', valueType: 'number', step: 'any' },
+      { key: 'y', inputType: 'number', valueType: 'number', step: 'any' },
+    ],
+    createRow(model) {
+      return { id: getNextPositiveId(model.nodes), x: 0, y: 0 };
+    },
   },
   {
     key: 'elements',
     rowsId: 'elements-rows',
-    title: '单元',
     columnCount: 6,
-    placeholder: '页面外壳已就绪，单元编辑会在后续任务中接入。',
+    placeholder: '暂无单元，点击“新增单元”开始编辑。',
+    fields: [
+      { key: 'id', inputType: 'number', valueType: 'integer' },
+      { key: 'node1', inputType: 'number', valueType: 'integer' },
+      { key: 'node2', inputType: 'number', valueType: 'integer' },
+      { key: 'E', inputType: 'number', valueType: 'number', step: 'any' },
+      { key: 'A', inputType: 'number', valueType: 'number', step: 'any' },
+    ],
+    createRow(model) {
+      const firstNode = model.nodes[0]?.id ?? 1;
+      const secondNode = model.nodes[1]?.id ?? firstNode;
+      return {
+        id: getNextPositiveId(model.elements),
+        node1: firstNode,
+        node2: secondNode,
+        E: 210000,
+        A: 100,
+      };
+    },
   },
   {
     key: 'loads',
     rowsId: 'loads-rows',
-    title: '荷载',
     columnCount: 4,
-    placeholder: '页面外壳已就绪，荷载编辑会在后续任务中接入。',
+    placeholder: '暂无荷载，点击“新增荷载”开始编辑。',
+    fields: [
+      { key: 'node', inputType: 'number', valueType: 'integer' },
+      { key: 'fx', inputType: 'number', valueType: 'number', step: 'any' },
+      { key: 'fy', inputType: 'number', valueType: 'number', step: 'any' },
+    ],
+    createRow(model) {
+      return {
+        node: model.nodes[model.nodes.length - 1]?.id ?? 1,
+        fx: 0,
+        fy: -1000,
+      };
+    },
   },
   {
     key: 'constraints',
     rowsId: 'constraints-rows',
-    title: '约束',
     columnCount: 4,
-    placeholder: '页面外壳已就绪，约束编辑会在后续任务中接入。',
+    placeholder: '暂无约束，点击“新增约束”开始编辑。',
+    fields: [
+      { key: 'node', inputType: 'number', valueType: 'integer' },
+      { key: 'fix_x', inputType: 'select', valueType: 'integer' },
+      { key: 'fix_y', inputType: 'select', valueType: 'integer' },
+    ],
+    createRow(model) {
+      return {
+        node: model.nodes[0]?.id ?? 1,
+        fix_x: 1,
+        fix_y: 1,
+      };
+    },
   },
 ];
 
-function createShellState() {
+const BROWSER_SECTION_LOOKUP = Object.fromEntries(
+  BROWSER_SECTION_CONFIG.map((section) => [
+    section.key,
+    {
+      ...section,
+      fieldLookup: Object.fromEntries(section.fields.map((field) => [field.key, field])),
+    },
+  ])
+);
+
+function createBrowserState() {
   return {
     model: createEmptyModel(),
     fileName: 'custom.model',
+    lastError: '',
   };
 }
 
-function getShellDom(doc) {
+function getBrowserDom(doc) {
   const dom = {
+    newModelButton: doc.getElementById('new-model-button'),
+    loadExampleButton: doc.getElementById('load-example-button'),
+    importModelButton: doc.getElementById('import-model-button'),
+    exportModelButton: doc.getElementById('export-model-button'),
+    fileNameInput: doc.getElementById('file-name-input'),
     importModelInput: doc.getElementById('import-model-input'),
     statusMessage: doc.getElementById('status-message'),
     errorMessage: doc.getElementById('error-message'),
@@ -440,7 +523,7 @@ function getShellDom(doc) {
     commandPreview: doc.getElementById('command-preview'),
   };
 
-  for (const section of SHELL_SECTION_CONFIG) {
+  for (const section of BROWSER_SECTION_CONFIG) {
     dom[section.key] = doc.getElementById(section.key);
     dom[section.rowsId] = doc.getElementById(section.rowsId);
   }
@@ -448,35 +531,250 @@ function getShellDom(doc) {
   return dom;
 }
 
-function renderShellRows(dom) {
-  for (const section of SHELL_SECTION_CONFIG) {
-    const rowsHost = dom[section.rowsId];
-    if (!rowsHost) {
-      continue;
+function getNextPositiveId(records) {
+  let maxId = 0;
+  for (const record of records) {
+    if (Number.isInteger(record.id) && record.id > maxId) {
+      maxId = record.id;
     }
+  }
+  return maxId + 1;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getEffectiveFileName(fileName) {
+  const text = String(fileName ?? '').trim();
+  return text === '' ? 'custom.model' : text;
+}
+
+function parseBrowserValue(rawValue, valueType) {
+  const text = String(rawValue ?? '').trim();
+  if (valueType === 'integer') {
+    const value = parseIntegerToken(text);
+    return value === null ? Number.NaN : value;
+  }
+  const value = parseNumberToken(text);
+  return value === null ? Number.NaN : value;
+}
+
+function renderFieldControl(field, value, index) {
+  if (field.inputType === 'select') {
+    const selectedValue = value === 0 || value === 1 ? String(value) : '';
+    return (
+      `<select data-action="edit-field" data-index="${index}" data-field="${field.key}">` +
+      `<option value=""${selectedValue === '' ? ' selected' : ''}>请选择</option>` +
+      `<option value="0"${selectedValue === '0' ? ' selected' : ''}>0</option>` +
+      `<option value="1"${selectedValue === '1' ? ' selected' : ''}>1</option>` +
+      `</select>`
+    );
+  }
+
+  const stepAttribute = field.step ? ` step="${field.step}"` : '';
+  return (
+    `<input type="${field.inputType}"${stepAttribute} data-action="edit-field" ` +
+    `data-index="${index}" data-field="${field.key}" value="${escapeHtml(value ?? '')}">`
+  );
+}
+
+function renderSectionRows(section, model, dom) {
+  const rowsHost = dom[section.rowsId];
+  if (!rowsHost) {
+    return;
+  }
+
+  const records = model[section.key];
+  if (!Array.isArray(records) || records.length === 0) {
     rowsHost.innerHTML =
-      `<tr>` +
-      `<td class="placeholder-cell" colspan="${section.columnCount}">${section.placeholder}</td>` +
-      `</tr>`;
+      `<tr><td class="placeholder-cell" colspan="${section.columnCount}">${section.placeholder}</td></tr>`;
+    return;
+  }
+
+  rowsHost.innerHTML = records
+    .map((record, index) => {
+      const cells = section.fields
+        .map((field) => `<td>${renderFieldControl(field, record[field.key], index)}</td>`)
+        .join('');
+      return (
+        `<tr>` +
+        `${cells}` +
+        `<td><button type="button" class="row-action" data-action="delete-row" data-section="${section.key}" data-index="${index}">删除</button></td>` +
+        `</tr>`
+      );
+    })
+    .join('');
+}
+
+function renderAllSections(dom, model) {
+  for (const section of BROWSER_SECTION_CONFIG) {
+    renderSectionRows(section, model, dom);
   }
 }
 
-function updateShellPanels(dom, state) {
+function updateStatusPanels(dom, state) {
+  const validation = validateModel(state.model);
+  const effectiveFileName = getEffectiveFileName(state.fileName);
+
+  if (dom.fileNameInput) {
+    dom.fileNameInput.value = state.fileName;
+  }
+  if (dom.commandPreview) {
+    dom.commandPreview.textContent = buildCommand(effectiveFileName);
+  }
+
+  if (validation.valid) {
+    const serialized = serializeModel(state.model);
+    if (dom.statusMessage) {
+      dom.statusMessage.className = 'status status--ok';
+      dom.statusMessage.textContent =
+        `模型有效：${state.model.nodes.length} 个节点、` +
+        `${state.model.elements.length} 个单元、` +
+        `${state.model.loads.length} 条荷载、` +
+        `${state.model.constraints.length} 条约束。`;
+    }
+    if (dom.errorMessage) {
+      dom.errorMessage.className = 'status status--error';
+      dom.errorMessage.textContent = state.lastError || '当前没有错误。';
+    }
+    if (dom.serializedPreview) {
+      dom.serializedPreview.textContent = serialized;
+    }
+    if (dom.exportModelButton) {
+      dom.exportModelButton.disabled = false;
+    }
+    return;
+  }
+
   if (dom.statusMessage) {
-    dom.statusMessage.className = 'status status--ok';
-    dom.statusMessage.textContent = '页面结构与响应式布局已加载，后续任务将补齐完整编辑能力。';
+    dom.statusMessage.className = 'status status--error';
+    dom.statusMessage.textContent = `模型当前不可导出：${validation.errors.length} 个问题待修正。`;
   }
   if (dom.errorMessage) {
     dom.errorMessage.className = 'status status--error';
-    dom.errorMessage.textContent = '当前没有错误；导入、导出和行编辑将在后续任务接入。';
+    dom.errorMessage.textContent = state.lastError || validation.errors.join('；');
   }
   if (dom.serializedPreview) {
     dom.serializedPreview.textContent =
-      '# 预览将在后续任务根据当前表格数据生成\n' +
-      'NODES ...\nELEMENTS ...\nLOADS ...\nCONSTRAINTS ...';
+      '# 当前模型校验失败，无法生成 .model 预览\n' + validation.errors.join('\n');
   }
-  if (dom.commandPreview) {
-    dom.commandPreview.textContent = buildCommand(state.fileName);
+  if (dom.exportModelButton) {
+    dom.exportModelButton.disabled = true;
+  }
+}
+
+function replaceModel(state, dom, nextModel) {
+  state.model = nextModel;
+  state.lastError = '';
+  renderAllSections(dom, state.model);
+  updateStatusPanels(dom, state);
+}
+
+function applyImportText(text, state, dom) {
+  const parsed = parseModel(text);
+  if (!parsed.ok) {
+    state.lastError = parsed.error;
+    updateStatusPanels(dom, state);
+    return false;
+  }
+
+  const validation = validateModel(parsed.model);
+  if (!validation.valid) {
+    state.lastError = validation.errors.join('；');
+    updateStatusPanels(dom, state);
+    return false;
+  }
+
+  replaceModel(state, dom, parsed.model);
+  return true;
+}
+
+function updateSingleField(section, event, state, dom) {
+  const target = event.target;
+  if (!target || !target.dataset || target.dataset.action !== 'edit-field') {
+    return;
+  }
+
+  const index = parseIntegerToken(target.dataset.index);
+  const fieldName = target.dataset.field;
+  if (index === null || index < 0 || !fieldName) {
+    return;
+  }
+
+  const field = section.fieldLookup[fieldName];
+  const records = state.model[section.key];
+  if (!field || !Array.isArray(records) || index >= records.length) {
+    return;
+  }
+
+  records[index] = {
+    ...records[index],
+    [fieldName]: parseBrowserValue(target.value, field.valueType),
+  };
+  state.lastError = '';
+  renderSectionRows(section, state.model, dom);
+  updateStatusPanels(dom, state);
+}
+
+function handleSectionClick(section, event, state, dom) {
+  const target = event.target;
+  if (!target || !target.dataset) {
+    return;
+  }
+
+  if (target.dataset.action === 'add-row') {
+    state.model[section.key].push(section.createRow(state.model));
+    state.lastError = '';
+    renderSectionRows(section, state.model, dom);
+    updateStatusPanels(dom, state);
+    return;
+  }
+
+  if (target.dataset.action === 'delete-row') {
+    const index = parseIntegerToken(target.dataset.index);
+    if (index === null || index < 0 || index >= state.model[section.key].length) {
+      return;
+    }
+    state.model[section.key].splice(index, 1);
+    state.lastError = '';
+    renderSectionRows(section, state.model, dom);
+    updateStatusPanels(dom, state);
+  }
+}
+
+function downloadModel(state) {
+  const validation = validateModel(state.model);
+  if (!validation.valid || typeof document === 'undefined') {
+    return;
+  }
+
+  const serialized = serializeModel(state.model);
+  const blob = new Blob([serialized], { type: 'text/plain;charset=utf-8' });
+  const urlApi =
+    (typeof window !== 'undefined' && window.URL) ||
+    (typeof URL !== 'undefined' ? URL : null);
+  if (!urlApi || typeof urlApi.createObjectURL !== 'function') {
+    return;
+  }
+
+  const url = urlApi.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = getEffectiveFileName(state.fileName);
+  anchor.hidden = true;
+  document.body?.appendChild(anchor);
+  anchor.click();
+  if (anchor.parentNode) {
+    anchor.parentNode.removeChild(anchor);
+  }
+  if (typeof urlApi.revokeObjectURL === 'function') {
+    urlApi.revokeObjectURL(url);
   }
 }
 
@@ -484,8 +782,9 @@ function initBrowserApp() {
   if (typeof document === 'undefined') {
     return;
   }
-  const state = createShellState();
-  const dom = getShellDom(document);
+
+  const state = createBrowserState();
+  const dom = getBrowserDom(document);
   const api = {
     createEmptyModel,
     parseModel,
@@ -496,8 +795,80 @@ function initBrowserApp() {
     dom,
   };
 
-  renderShellRows(dom);
-  updateShellPanels(dom, state);
+  if (dom.newModelButton) {
+    dom.newModelButton.addEventListener('click', () => {
+      replaceModel(state, dom, createEmptyModel());
+    });
+  }
+
+  if (dom.loadExampleButton) {
+    dom.loadExampleButton.addEventListener('click', () => {
+      applyImportText(SAMPLE_MODEL_TEXT, state, dom);
+    });
+  }
+
+  if (dom.importModelButton && dom.importModelInput) {
+    dom.importModelButton.addEventListener('click', () => {
+      dom.importModelInput.click();
+    });
+  }
+
+  if (dom.fileNameInput) {
+    const handleFileNameChange = (event) => {
+      state.fileName = String(event.target?.value ?? '');
+      state.lastError = '';
+      updateStatusPanels(dom, state);
+    };
+    dom.fileNameInput.addEventListener('input', handleFileNameChange);
+    dom.fileNameInput.addEventListener('change', handleFileNameChange);
+  }
+
+  if (dom.importModelInput) {
+    dom.importModelInput.addEventListener('change', async (event) => {
+      const input = event.target;
+      const file = input?.files?.[0];
+      if (!file || typeof file.text !== 'function') {
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        applyImportText(text, state, dom);
+      } catch (error) {
+        state.lastError = error instanceof Error ? error.message : String(error);
+        updateStatusPanels(dom, state);
+      } finally {
+        if (input) {
+          input.value = '';
+        }
+      }
+    });
+  }
+
+  if (dom.exportModelButton) {
+    dom.exportModelButton.addEventListener('click', () => {
+      downloadModel(state);
+    });
+  }
+
+  for (const section of Object.values(BROWSER_SECTION_LOOKUP)) {
+    const sectionHost = dom[section.key];
+    if (!sectionHost) {
+      continue;
+    }
+    sectionHost.addEventListener('input', (event) => {
+      updateSingleField(section, event, state, dom);
+    });
+    sectionHost.addEventListener('change', (event) => {
+      updateSingleField(section, event, state, dom);
+    });
+    sectionHost.addEventListener('click', (event) => {
+      handleSectionClick(section, event, state, dom);
+    });
+  }
+
+  renderAllSections(dom, state.model);
+  updateStatusPanels(dom, state);
 
   if (typeof window !== 'undefined') {
     window.webModelEditor = api;

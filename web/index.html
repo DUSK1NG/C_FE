@@ -22,6 +22,10 @@
           <button id="load-example-button" type="button">加载示例</button>
           <button id="import-model-button" type="button">导入 .model</button>
           <button id="export-model-button" type="button">导出 .model</button>
+          <label class="toolbar-field" for="file-name-input">
+            <span>导出文件名</span>
+            <input id="file-name-input" type="text" value="custom.model" spellcheck="false">
+          </label>
           <input id="import-model-input" type="file" accept=".model" hidden>
         </div>
       </section>
@@ -51,7 +55,7 @@
               <p class="section-kicker">Section 1</p>
               <h2 id="nodes-title">节点</h2>
             </div>
-            <button id="add-node-button" type="button">新增节点</button>
+            <button id="add-node-button" type="button" data-action="add-row" data-section="nodes">新增节点</button>
           </div>
           <div class="table-scroll">
             <table>
@@ -74,7 +78,7 @@
               <p class="section-kicker">Section 2</p>
               <h2 id="elements-title">单元</h2>
             </div>
-            <button id="add-element-button" type="button">新增单元</button>
+            <button id="add-element-button" type="button" data-action="add-row" data-section="elements">新增单元</button>
           </div>
           <div class="table-scroll">
             <table>
@@ -99,7 +103,7 @@
               <p class="section-kicker">Section 3</p>
               <h2 id="loads-title">荷载</h2>
             </div>
-            <button id="add-load-button" type="button">新增荷载</button>
+            <button id="add-load-button" type="button" data-action="add-row" data-section="loads">新增荷载</button>
           </div>
           <div class="table-scroll">
             <table>
@@ -122,7 +126,7 @@
               <p class="section-kicker">Section 4</p>
               <h2 id="constraints-title">约束</h2>
             </div>
-            <button id="add-constraint-button" type="button">新增约束</button>
+            <button id="add-constraint-button" type="button" data-action="add-row" data-section="constraints">新增约束</button>
           </div>
           <div class="table-scroll">
             <table>

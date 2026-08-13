@@ -62,17 +62,27 @@ function makeValidModel() {
   };
 }
 
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function makeFakeElement(id) {
-  return {
+  const element = {
     id,
+    tagName: 'DIV',
     className: '',
     dataset: {},
     disabled: false,
     hidden: false,
-    innerHTML: '',
-    textContent: '',
-    value: '',
+    files: [],
     listeners: {},
+    children: [],
+    parentNode: null,
+    clickCount: 0,
+    lastWriteMode: null,
     addEventListener(type, listener) {
       this.listeners[type] = listener;
     },
@@ -82,11 +92,78 @@ function makeFakeElement(id) {
     removeAttribute(name) {
       delete this[name];
     },
+    appendChild(child) {
+      this.children.push(child);
+      child.parentNode = this;
+      return child;
+    },
+    removeChild(child) {
+      this.children = this.children.filter((entry) => entry !== child);
+      child.parentNode = null;
+      return child;
+    },
+    click() {
+      this.clickCount += 1;
+    },
   };
+
+  let innerHTML = '';
+  let textContent = '';
+  let value = '';
+  Object.defineProperties(element, {
+    innerHTML: {
+      get() {
+        return innerHTML;
+      },
+      set(nextValue) {
+        innerHTML = String(nextValue);
+        textContent = '';
+        this.lastWriteMode = 'innerHTML';
+      },
+    },
+    textContent: {
+      get() {
+        return textContent;
+      },
+      set(nextValue) {
+        textContent = String(nextValue);
+        innerHTML = escapeHtml(textContent);
+        this.lastWriteMode = 'textContent';
+      },
+    },
+    value: {
+      get() {
+        return value;
+      },
+      set(nextValue) {
+        value = String(nextValue);
+      },
+    },
+  });
+
+  return element;
+}
+
+async function dispatchEvent(element, type, overrides = {}) {
+  const listener = element.listeners[type];
+  assert.equal(typeof listener, 'function', `${element.id} should register a ${type} listener`);
+  const event = {
+    target: element,
+    currentTarget: element,
+    preventDefault() {},
+    stopPropagation() {},
+    ...overrides,
+  };
+  return await listener(event);
 }
 
 function loadAppWithFakeDom() {
   const ids = [
+    'new-model-button',
+    'load-example-button',
+    'import-model-button',
+    'export-model-button',
+    'file-name-input',
     'import-model-input',
     'status-message',
     'error-message',
@@ -102,19 +179,49 @@ function loadAppWithFakeDom() {
     'constraints-rows',
   ];
   const elements = new Map(ids.map((id) => [id, makeFakeElement(id)]));
+  const createdObjectUrls = [];
+  const revokedObjectUrls = [];
+  const createdAnchors = [];
   const fakeDocument = {
     body: makeFakeElement('body'),
     getElementById(id) {
       return elements.get(id) ?? null;
     },
+    createElement(tagName) {
+      const element = makeFakeElement(`${tagName}-${createdAnchors.length + 1}`);
+      element.tagName = String(tagName).toUpperCase();
+      if (element.tagName === 'A') {
+        createdAnchors.push(element);
+      }
+      return element;
+    },
   };
-  const fakeWindow = {};
+  const fakeWindow = {
+    URL: {
+      createObjectURL(blob) {
+        const value = `blob:fake-${createdObjectUrls.length + 1}`;
+        createdObjectUrls.push({ value, blob });
+        return value;
+      },
+      revokeObjectURL(value) {
+        revokedObjectUrls.push(value);
+      },
+    },
+  };
   const modulePath = require.resolve('../web/app.js');
   const previousDocument = global.document;
   const previousWindow = global.window;
+  const previousBlob = global.Blob;
+  const FakeBlob = class FakeBlob {
+    constructor(parts, options = {}) {
+      this.parts = parts;
+      this.type = options.type ?? '';
+    }
+  };
   delete require.cache[modulePath];
   global.document = fakeDocument;
   global.window = fakeWindow;
+  global.Blob = FakeBlob;
   const reloadedModule = require('../web/app.js');
   delete require.cache[modulePath];
   if (previousDocument === undefined) {
@@ -127,7 +234,21 @@ function loadAppWithFakeDom() {
   } else {
     global.window = previousWindow;
   }
-  return { elements, fakeDocument, fakeWindow, reloadedModule };
+  if (previousBlob === undefined) {
+    delete global.Blob;
+  } else {
+    global.Blob = previousBlob;
+  }
+  return {
+    elements,
+    fakeDocument,
+    fakeWindow,
+    FakeBlob,
+    reloadedModule,
+    createdObjectUrls,
+    revokedObjectUrls,
+    createdAnchors,
+  };
 }
 
 const parsed = parseModel(source);
@@ -146,6 +267,7 @@ assert.equal(triangleParsed.model.constraints.length, 3);
 const triangleRoundTrip = parseModel(serializeModel(triangleParsed.model));
 assert.equal(triangleRoundTrip.ok, true, triangleRoundTrip.error);
 assert.deepEqual(triangleRoundTrip.model, triangleParsed.model);
+const serializedTriangle = serializeModel(triangleParsed.model);
 
 const commentRichSource = `
 # full-line comments and blank lines are ignored
@@ -496,6 +618,7 @@ assert.equal(fs.existsSync(indexPath), true, 'index.html should exist');
 const indexHtml = fs.readFileSync(indexPath, 'utf8');
 assert.match(indexHtml, /<link[^>]+href=["']\.\/styles\.css["']/);
 assert.match(indexHtml, /<script[^>]+src=["']\.\/app\.js["']/);
+assert.match(indexHtml, /id=["']file-name-input["']/);
 for (const sectionId of ['nodes', 'elements', 'loads', 'constraints']) {
   assert.match(
     indexHtml,
@@ -517,6 +640,7 @@ assert.equal(
   browserRuntime.elements.get('command-preview').textContent,
   buildCommand('custom.model')
 );
+assert.equal(browserRuntime.elements.get('export-model-button').disabled, true);
 for (const rowsId of ['nodes-rows', 'elements-rows', 'loads-rows', 'constraints-rows']) {
   assert.equal(
     browserRuntime.elements.get(rowsId).innerHTML.length > 0,
@@ -525,4 +649,152 @@ for (const rowsId of ['nodes-rows', 'elements-rows', 'loads-rows', 'constraints-
   );
 }
 
-console.log('web model tests passed');
+async function runBrowserWorkflowAssertions() {
+  const runtime = loadAppWithFakeDom();
+  const {
+    elements,
+    fakeDocument,
+    fakeWindow,
+    FakeBlob,
+    createdObjectUrls,
+    revokedObjectUrls,
+    createdAnchors,
+  } = runtime;
+
+  const previousDocument = global.document;
+  const previousWindow = global.window;
+  const previousBlob = global.Blob;
+  global.document = fakeDocument;
+  global.window = fakeWindow;
+  global.Blob = FakeBlob;
+
+  try {
+    await dispatchEvent(elements.get('load-example-button'), 'click');
+    assert.deepEqual(fakeWindow.webModelEditor.state.model, triangleParsed.model);
+    assert.equal(elements.get('serialized-preview').textContent, serializedTriangle);
+    assert.equal(elements.get('export-model-button').disabled, false);
+    assert.match(elements.get('nodes-rows').innerHTML, /value="500"/);
+
+    const nodesBeforeEdit = elements.get('nodes-rows').innerHTML;
+    const elementsBeforeEdit = elements.get('elements-rows').innerHTML;
+    await dispatchEvent(elements.get('nodes'), 'input', {
+      target: {
+        dataset: { action: 'edit-field', index: '2', field: 'x' },
+        value: '650',
+      },
+    });
+    assert.equal(fakeWindow.webModelEditor.state.model.nodes[2].x, 650);
+    assert.notEqual(elements.get('nodes-rows').innerHTML, nodesBeforeEdit);
+    assert.equal(elements.get('elements-rows').innerHTML, elementsBeforeEdit);
+    assert.match(elements.get('serialized-preview').textContent, /3 650 800/);
+
+    await dispatchEvent(elements.get('nodes'), 'click', {
+      target: {
+        dataset: { action: 'add-row', section: 'nodes' },
+      },
+    });
+    assert.equal(fakeWindow.webModelEditor.state.model.nodes.length, 4);
+
+    await dispatchEvent(elements.get('nodes'), 'click', {
+      target: {
+        dataset: { action: 'delete-row', section: 'nodes', index: '3' },
+      },
+    });
+    assert.equal(fakeWindow.webModelEditor.state.model.nodes.length, 3);
+
+    await dispatchEvent(elements.get('new-model-button'), 'click');
+    assert.deepEqual(fakeWindow.webModelEditor.state.model, createEmptyModel());
+    assert.equal(elements.get('export-model-button').disabled, true);
+
+    await dispatchEvent(elements.get('import-model-button'), 'click');
+    assert.equal(elements.get('import-model-input').clickCount, 1);
+
+    elements.get('import-model-input').files = [
+      {
+        name: 'triangle.model',
+        async text() {
+          return triangleSource;
+        },
+      },
+    ];
+    await dispatchEvent(elements.get('import-model-input'), 'change', {
+      target: elements.get('import-model-input'),
+    });
+    assert.deepEqual(fakeWindow.webModelEditor.state.model, triangleParsed.model);
+    assert.equal(elements.get('serialized-preview').textContent, serializedTriangle);
+
+    const modelBeforeFailedImport = JSON.parse(JSON.stringify(fakeWindow.webModelEditor.state.model));
+    elements.get('import-model-input').files = [
+      {
+        name: 'broken.model',
+        async text() {
+          return `NODES 1
+1 0 0
+
+ELEMENTS 0
+
+LOADS 0
+
+CONSTRAINTS 0
+`;
+        },
+      },
+    ];
+    await dispatchEvent(elements.get('import-model-input'), 'change', {
+      target: elements.get('import-model-input'),
+    });
+    assert.deepEqual(fakeWindow.webModelEditor.state.model, modelBeforeFailedImport);
+    assert.match(elements.get('error-message').textContent, /element/i);
+
+    elements.get('file-name-input').value = '<img src=x onerror=1>.model';
+    await dispatchEvent(elements.get('file-name-input'), 'input', {
+      target: elements.get('file-name-input'),
+    });
+    assert.equal(
+      elements.get('command-preview').textContent,
+      buildCommand('<img src=x onerror=1>.model')
+    );
+    assert.equal(elements.get('command-preview').lastWriteMode, 'textContent');
+    assert.doesNotMatch(elements.get('command-preview').innerHTML, /<img/i);
+
+    elements.get('file-name-input').value = '';
+    await dispatchEvent(elements.get('file-name-input'), 'input', {
+      target: elements.get('file-name-input'),
+    });
+    await dispatchEvent(elements.get('export-model-button'), 'click');
+
+    assert.equal(createdObjectUrls.length, 1);
+    assert.equal(createdObjectUrls[0].blob.type, 'text/plain;charset=utf-8');
+    assert.deepEqual(createdObjectUrls[0].blob.parts, [serializedTriangle]);
+    assert.equal(createdAnchors.length, 1);
+    assert.equal(createdAnchors[0].download, 'custom.model');
+    assert.equal(createdAnchors[0].href, 'blob:fake-1');
+    assert.equal(createdAnchors[0].clickCount, 1);
+    assert.deepEqual(revokedObjectUrls, ['blob:fake-1']);
+  } finally {
+    if (previousDocument === undefined) {
+      delete global.document;
+    } else {
+      global.document = previousDocument;
+    }
+    if (previousWindow === undefined) {
+      delete global.window;
+    } else {
+      global.window = previousWindow;
+    }
+    if (previousBlob === undefined) {
+      delete global.Blob;
+    } else {
+      global.Blob = previousBlob;
+    }
+  }
+}
+
+runBrowserWorkflowAssertions()
+  .then(() => {
+    console.log('web model tests passed');
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
