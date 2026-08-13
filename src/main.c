@@ -1,8 +1,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "cli.h"
 #include "config.h"
 #include "fem.h"
+#include "io.h"
+#include "output.h"
+#include "pipeline.h"
+
+enum {
+    EXIT_CLI_ERROR = 2,
+    EXIT_INPUT_ERROR = 3,
+    EXIT_ANALYSIS_ERROR = 4,
+    EXIT_OUTPUT_ERROR = 5,
+    OUTPUT_PATH_CAPACITY = 512,
+    OUTPUT_TARGET_COUNT = 3
+};
+
+typedef FemStatus (*OutputWriter)(const char *path,
+                                  const FemModel *model,
+                                  const FemResults *results,
+                                  const FemOutputOptions *options);
+
+typedef struct {
+    unsigned format_bit;
+    const char *extension;
+    OutputWriter writer;
+} OutputTarget;
 
 static void print_matrix(double matrix[4][4])
 {
@@ -17,7 +41,7 @@ static void print_matrix(double matrix[4][4])
     }
 }
 
-int main(void)
+static int run_demo(void)
 {
     const Node node_i = {.id = 1, .x = 0.0, .y = 0.0, .fx = 0.0,
                          .fy = 0.0, .fix_x = 0, .fix_y = 0};
@@ -30,13 +54,13 @@ int main(void)
     status = calculate_element_geometry(&node_i, &node_j, &element);
     if (status != FEM_OK) {
         fprintf(stderr, "Geometry error: %s\n", fem_status_message(status));
-        return EXIT_FAILURE;
+        return EXIT_ANALYSIS_ERROR;
     }
 
     status = calculate_element_stiffness(&element, ke);
     if (status != FEM_OK) {
         fprintf(stderr, "Stiffness error: %s\n", fem_status_message(status));
-        return EXIT_FAILURE;
+        return EXIT_ANALYSIS_ERROR;
     }
 
     printf("Stage 1: single 2D truss element\n");
@@ -50,4 +74,123 @@ int main(void)
 #endif
 
     return EXIT_SUCCESS;
+}
+
+static int build_output_path(char path[OUTPUT_PATH_CAPACITY],
+                             const char *output_dir,
+                             const char *prefix,
+                             const char *extension)
+{
+    int written;
+
+    if (path == NULL || output_dir == NULL || output_dir[0] == '\0' ||
+        prefix == NULL || prefix[0] == '\0' ||
+        extension == NULL || extension[0] == '\0') {
+        return 0;
+    }
+
+    written = snprintf(path, OUTPUT_PATH_CAPACITY, "%s/%s%s", output_dir,
+                       prefix, extension);
+    return written >= 0 && written < OUTPUT_PATH_CAPACITY;
+}
+
+static void remove_output_files(
+    char output_paths[OUTPUT_TARGET_COUNT][OUTPUT_PATH_CAPACITY],
+    int path_count)
+{
+    int i;
+
+    for (i = 0; i < path_count; ++i) {
+        if (output_paths[i][0] != '\0') {
+            remove(output_paths[i]);
+        }
+    }
+}
+
+static int write_selected_outputs(const CliOptions *options,
+                                  const FemModel *model,
+                                  const FemResults *results)
+{
+    static const OutputTarget output_targets[OUTPUT_TARGET_COUNT] = {
+        {FEM_FORMAT_TXT, ".txt", write_results_txt_selected},
+        {FEM_FORMAT_MARKDOWN, ".md", write_results_markdown_selected},
+        {FEM_FORMAT_CSV, ".csv", write_results_csv_selected},
+    };
+    const FemOutputOptions output_options = {options->sections};
+    char output_paths[OUTPUT_TARGET_COUNT][OUTPUT_PATH_CAPACITY] = {{0}};
+    int created_count = 0;
+    int i;
+
+    for (i = 0; i < OUTPUT_TARGET_COUNT; ++i) {
+        FemStatus status;
+
+        if ((options->formats & output_targets[i].format_bit) == 0u) {
+            continue;
+        }
+
+        if (!build_output_path(output_paths[created_count], options->output_dir,
+                               options->prefix,
+                               output_targets[i].extension)) {
+            fprintf(stderr, "Output error: invalid output path.\n");
+            remove_output_files(output_paths, created_count);
+            return EXIT_OUTPUT_ERROR;
+        }
+
+        status = output_targets[i].writer(output_paths[created_count], model,
+                                          results, &output_options);
+        if (status != FEM_OK) {
+            ++created_count;
+            fprintf(stderr, "Output error: %s: %s\n",
+                    output_paths[created_count - 1],
+                    fem_status_message(status));
+            remove_output_files(output_paths, created_count);
+            return EXIT_OUTPUT_ERROR;
+        }
+
+        ++created_count;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int main(int argc, char *argv[])
+{
+    CliOptions options;
+    char error_message[256];
+    FemModel model;
+    FemResults results = {0};
+    FemStatus status;
+    int parse_status;
+
+    parse_status = cli_parse_args(argc, argv, &options, error_message,
+                                  sizeof(error_message));
+    if (parse_status != 0) {
+        if (error_message[0] != '\0') {
+            fprintf(stderr, "%s\n", error_message);
+        }
+        return parse_status;
+    }
+
+    if (options.help != 0) {
+        cli_print_help(stdout);
+        return EXIT_SUCCESS;
+    }
+
+    if (options.demo != 0) {
+        return run_demo();
+    }
+
+    status = read_model_file(options.input_path, &model);
+    if (status != FEM_OK) {
+        fprintf(stderr, "Input error: %s\n", fem_status_message(status));
+        return EXIT_INPUT_ERROR;
+    }
+
+    status = run_fem_analysis(&model, &results);
+    if (status != FEM_OK) {
+        fprintf(stderr, "Analysis error: %s\n", fem_status_message(status));
+        return EXIT_ANALYSIS_ERROR;
+    }
+
+    return write_selected_outputs(&options, &model, &results);
 }
