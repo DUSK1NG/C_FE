@@ -49,9 +49,10 @@ medium.csv
 - 加载示例或导入 `.model` 文件
 - 编辑节点、单元、荷载和约束
 - 校验数据并预览模型
+- 在浏览器内分析示例和上传的 `.model` 文件
 - 导出规范化的 `.model` 文件
 
-网页只负责编辑和导出模型，不能直接启动 `fem`。导出后请在终端中运行求解命令。详细说明见 [`web/README.md`](web/README.md)。
+网页分析由浏览器中的 JavaScript 完成，不能直接启动 `fem`；C11 CLI 仍可在终端生成 TXT、Markdown、CSV 结果。详细说明见 [`web/README.md`](web/README.md)。
 
 ## `.model` 输入格式
 

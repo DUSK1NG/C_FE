@@ -1081,7 +1081,11 @@ async function runBrowserWorkflowAssertions() {
     await dispatchEvent(elements.get('analyze-model-button'), 'click');
     assert.equal(fakeWindow.webModelEditor.state.analysis.ok, true);
     assert.match(elements.get('analysis-panel').className, /^analysis-panel$/);
-    assert.match(elements.get('analysis-status').textContent, /完成/);
+    assert.match(
+      elements.get('analysis-status').textContent,
+      /浏览器.*完成|完成.*浏览器/,
+      'successful analysis should explicitly identify browser-side execution'
+    );
     for (const targetId of [
       'node-results-rows',
       'element-results-rows',
@@ -1215,6 +1219,56 @@ async function runBrowserWorkflowAssertions() {
     });
     assert.deepEqual(fakeWindow.webModelEditor.state.model, triangleParsed.model);
     assert.equal(elements.get('serialized-preview').textContent, serializedTriangle);
+    assert.equal(elements.get('import-model-input').value, '');
+
+    await dispatchEvent(elements.get('analyze-model-button'), 'click');
+    assert.equal(fakeWindow.webModelEditor.state.analysis.ok, true);
+    assert.match(elements.get('analysis-panel').className, /^analysis-panel$/);
+    assert.match(elements.get('analysis-status').textContent, /浏览器/);
+
+    const firstAnalysisDisplacement = fakeWindow.webModelEditor.state.analysis.results.nodeDisplacements[2].uy;
+    const loadFyInput = {
+      dataset: { action: 'edit-field', index: '0', field: 'fy' },
+      value: '-2000',
+    };
+    await dispatchEvent(elements.get('loads'), 'input', { target: loadFyInput });
+    assert.equal(fakeWindow.webModelEditor.state.analysis, null);
+    assert.equal(elements.get('node-results-rows').innerHTML, '');
+
+    await dispatchEvent(elements.get('analyze-model-button'), 'click');
+    assert.notEqual(
+      fakeWindow.webModelEditor.state.analysis.results.nodeDisplacements[2].uy,
+      firstAnalysisDisplacement,
+      'editing a load should recompute displacement instead of retaining prior results'
+    );
+
+    fakeWindow.webModelEditor.state.model.elements[0].A = 0;
+    await dispatchEvent(elements.get('analyze-model-button'), 'click');
+    assert.equal(fakeWindow.webModelEditor.state.analysis, null);
+    assert.match(elements.get('analysis-panel').className, /analysis-panel--hidden/);
+    for (const targetId of [
+      'node-results-rows',
+      'element-results-rows',
+      'reaction-results-rows',
+      'summary-results',
+      'deformation-svg',
+      'axial-force-svg',
+    ]) {
+      assert.equal(elements.get(targetId).innerHTML, '', `${targetId} should clear after analysis failure`);
+    }
+    assert.match(elements.get('error-message').textContent, /浏览器端分析失败/);
+
+    elements.get('import-model-input').files = [
+      {
+        name: 'triangle.model',
+        async text() {
+          return triangleSource;
+        },
+      },
+    ];
+    await dispatchEvent(elements.get('import-model-input'), 'change', {
+      target: elements.get('import-model-input'),
+    });
 
     const modelBeforeFailedImport = JSON.parse(JSON.stringify(fakeWindow.webModelEditor.state.model));
     elements.get('import-model-input').files = [
@@ -1238,6 +1292,8 @@ CONSTRAINTS 0
     });
     assert.deepEqual(fakeWindow.webModelEditor.state.model, modelBeforeFailedImport);
     assert.match(elements.get('error-message').textContent, /element/i);
+    assert.match(elements.get('error-message').textContent, /导入失败/);
+    assert.equal(elements.get('import-model-input').value, '');
 
     const maxCapacityModel = makeMaxCapacityModel();
     elements.get('import-model-input').files = [

@@ -1147,7 +1147,7 @@ function renderAnalysisTables(dom, results) {
   }
   if (dom.analysisStatus) {
     dom.analysisStatus.className = 'status status--ok';
-    dom.analysisStatus.textContent = '分析完成';
+    dom.analysisStatus.textContent = '浏览器端分析完成';
   }
   if (dom.analysisPanel) {
     dom.analysisPanel.className = 'analysis-panel';
@@ -1181,7 +1181,7 @@ function runAnalysis(state, dom) {
   clearAnalysis(dom, state);
   const analysis = analyzeModel(state.model);
   if (!analysis.ok) {
-    state.lastError = analysis.error;
+    state.lastError = `浏览器端分析失败：${analysis.error}`;
     updateStatusPanels(dom, state);
     return;
   }
@@ -1199,7 +1199,7 @@ function runAnalysis(state, dom) {
     updateStatusPanels(dom, state);
   } catch (error) {
     clearAnalysis(dom, state);
-    state.lastError = error instanceof Error ? error.message : String(error);
+    state.lastError = `浏览器端分析失败：${error instanceof Error ? error.message : String(error)}`;
     updateStatusPanels(dom, state);
   }
 }
@@ -1365,7 +1365,7 @@ function replaceModel(state, dom, nextModel) {
 function applyImportText(text, state, dom) {
   const parsed = parseModel(text);
   if (!parsed.ok) {
-    state.lastError = parsed.error;
+    state.lastError = `导入失败：${parsed.error}`;
     updateStatusPanels(dom, state);
     return false;
   }
@@ -1520,7 +1520,7 @@ function initBrowserApp() {
         const text = await file.text();
         applyImportText(text, state, dom);
       } catch (error) {
-        state.lastError = error instanceof Error ? error.message : String(error);
+        state.lastError = `导入失败：${error instanceof Error ? error.message : String(error)}`;
         updateStatusPanels(dom, state);
       } finally {
         if (input) {
