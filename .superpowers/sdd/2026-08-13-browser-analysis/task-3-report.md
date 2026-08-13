@@ -107,3 +107,52 @@ git diff --check                         # 退出码 0，无差异错误
 ```
 
 修复实现提交：`920e5c7149c9e803470b6e3ae84b037418e32033` (`fix: preserve deformation chart bounds for offset models`)。
+
+## 审查修复轮次 2：极小跨度 viewBox
+
+复审发现：偏移坐标修复后，极小但有效的模型跨度仍会经过 SVG 数字格式化舍入为零，导致 `viewBox="0 0 0 0"`。
+
+修复内容：
+
+- 增加仅用于 SVG 显示坐标的 `MINIMUM_DEFORMATION_DISPLAY_SPAN = 0.0001`。
+- 在 `minX` / `minY` 平移之后，对极小跨度的局部图形和位移使用同一显示比例；真实跨度较大的模型不缩放。
+- `viewBox`、节点半径、位移缩放和图例都使用同一显示跨度，因此宽高始终为正、图例保持在 `viewBox` 内，且上一轮偏移坐标修复不受影响。
+- 增加通过 `validateModel` 的 `1e-12` 有效三角模型回归测试，断言有限的正 `viewBox` 尺寸、节点和图例输出，以及无 `NaN` / `Infinity`。
+
+TDD 红灯命令：
+
+```text
+C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe tests\test_web_model.js
+```
+
+实际失败输出：
+
+```text
+AssertionError: assert.ok(tinySpanViewBox[2] > 0 && Number.isFinite(tinySpanViewBox[2]))
+```
+
+最终验证命令和实际输出：
+
+```text
+C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe --check web\app.js
+```
+
+实际输出：无输出，退出码 0。
+
+```text
+C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe tests\test_web_model.js
+```
+
+实际输出：
+
+```text
+web model tests passed
+```
+
+```text
+git diff --check
+```
+
+实际输出：无差异错误，退出码 0。
+
+修复实现提交：`825b61eab795655705051483116e85d85db06945` (`fix: keep deformation viewbox visible for tiny spans`)。
