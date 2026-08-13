@@ -132,6 +132,10 @@ static void assert_invalid_forms(void)
         unknown_section_3, unknown_section_4
     };
 
+    char unknown_option_0[] = "fem";
+    char unknown_option_1[] = "--bogus";
+    char *unknown_option_argv[] = {unknown_option_0, unknown_option_1};
+
     char duplicate_format_0[] = "fem";
     char duplicate_format_1[] = "--input";
     char duplicate_format_2[] = "tests/data/medium.model";
@@ -173,6 +177,9 @@ static void assert_invalid_forms(void)
     assert_invalid_args((int)(sizeof(unknown_section_argv) /
                               sizeof(unknown_section_argv[0])),
                         unknown_section_argv);
+    assert_invalid_args((int)(sizeof(unknown_option_argv) /
+                              sizeof(unknown_option_argv[0])),
+                        unknown_option_argv);
     assert_invalid_args((int)(sizeof(duplicate_format_argv) /
                               sizeof(duplicate_format_argv[0])),
                         duplicate_format_argv);
