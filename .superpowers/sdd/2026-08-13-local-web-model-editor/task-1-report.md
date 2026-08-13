@@ -107,3 +107,59 @@ fem --input 'unsafe;$(echo pwned).model'
 fem --input 'my model.model'
 fem --input 'sample.model'
 ```
+
+## Fix Round 2
+
+### Regression Test Added
+
+`tests/test_web_model.js` now asserts PowerShell-safe quoting for:
+
+- `owner's.model`
+
+The existing space and shell-special-character checks remain in place.
+
+### Red Run Before Fix
+
+`& 'C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' 'tests\test_web_model.js'`
+
+Output:
+
+```text
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ `fem --input 'owner'"'"'s.model'`
+- "fem --input 'owner''s.model'"
+```
+
+### Fix Applied
+
+`web/app.js` now uses PowerShell single-quote escaping for command arguments:
+
+- wrap the argument in outer single quotes
+- double any embedded single quote characters
+
+### Green Runs After Fix
+
+`& 'C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' 'tests\test_web_model.js'`
+
+Output:
+
+```text
+web model tests passed
+```
+
+`@'
+const { buildCommand } = require("./web/app.js");
+console.log(buildCommand("my model.model"));
+console.log(buildCommand("unsafe;$(echo pwned).model"));
+console.log(buildCommand("owner's.model"));
+'@ | & 'C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' -`
+
+Output:
+
+```text
+fem --input 'my model.model'
+fem --input 'unsafe;$(echo pwned).model'
+fem --input 'owner''s.model'
+```

@@ -32,4 +32,5 @@ assert.equal(
   buildCommand('unsafe;$(echo pwned).model'),
   "fem --input 'unsafe;$(echo pwned).model'"
 );
+assert.equal(buildCommand("owner's.model"), "fem --input 'owner''s.model'");
 console.log('web model tests passed');
