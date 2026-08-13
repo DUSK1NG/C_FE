@@ -188,54 +188,181 @@ function parseModel(text) {
   }
 }
 
-function validateUniqueIds(records, label) {
-  const seen = new Set();
-  for (const record of records) {
-    if (!Number.isInteger(record.id) || record.id <= 0 || seen.has(record.id)) {
-      return `${label} IDs must be unique positive integers`;
+const SECTION_LIMITS = {
+  nodes: MAX_NODES,
+  elements: MAX_ELEMENTS,
+  loads: MAX_LOADS,
+  constraints: MAX_CONSTRAINTS,
+};
+
+const SECTION_LABELS = {
+  nodes: 'NODES',
+  elements: 'ELEMENTS',
+  loads: 'LOADS',
+  constraints: 'CONSTRAINTS',
+};
+
+function createValidationIssue(sectionKey, rowIndex, field, message) {
+  const sectionLabel = SECTION_LABELS[sectionKey] ?? String(sectionKey).toUpperCase();
+  const rowText = Number.isInteger(rowIndex) ? ` row ${rowIndex + 1}` : '';
+  const fieldText = field ? ` ${field}` : '';
+  return {
+    sectionKey,
+    section: sectionLabel,
+    rowIndex,
+    field,
+    message: `${sectionLabel}${rowText}${fieldText} ${message}`.trim(),
+  };
+}
+
+function createDuplicateRowIssues(records, sectionKey, idField) {
+  const issues = [];
+  const seen = new Map();
+  const flagged = new Set();
+
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    const value = record?.id;
+    if (!Number.isInteger(value) || value <= 0) {
+      issues.push(createValidationIssue(sectionKey, index, idField, 'must be a unique positive integer'));
+      continue;
     }
-    seen.add(record.id);
+    const previousIndex = seen.get(value);
+    if (previousIndex !== undefined) {
+      if (!flagged.has(previousIndex)) {
+        issues.push(
+          createValidationIssue(sectionKey, previousIndex, idField, 'must be a unique positive integer')
+        );
+        flagged.add(previousIndex);
+      }
+      issues.push(createValidationIssue(sectionKey, index, idField, 'must be a unique positive integer'));
+      flagged.add(index);
+      continue;
+    }
+    seen.set(value, index);
   }
-  return null;
+
+  return issues;
 }
 
 function validateNodeMap(nodes) {
+  const issues = createDuplicateRowIssues(nodes, 'nodes', 'ID');
   const nodeIds = new Set();
-  for (const node of nodes) {
-    if (
-      !Number.isInteger(node.id) ||
-      node.id <= 0 ||
-      !Number.isFinite(node.x) ||
-      !Number.isFinite(node.y) ||
-      nodeIds.has(node.id)
-    ) {
-      return 'Nodes must have unique positive integer IDs and finite coordinates';
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    if (Number.isInteger(node?.id) && node.id > 0) {
+      nodeIds.add(node.id);
     }
-    nodeIds.add(node.id);
+    if (!Number.isFinite(node?.x)) {
+      issues.push(createValidationIssue('nodes', index, 'x', 'must be a finite number'));
+    }
+    if (!Number.isFinite(node?.y)) {
+      issues.push(createValidationIssue('nodes', index, 'y', 'must be a finite number'));
+    }
   }
-  return nodeIds;
+
+  return { nodeIds, issues };
 }
 
-function validateRefRecords(records, nodeIds, label, extraCheck) {
-  const seen = new Set();
-  for (const record of records) {
-    const key = record.node;
-    if (!Number.isInteger(key) || key <= 0 || seen.has(key) || !nodeIds.has(key)) {
-      return `${label} must reference existing nodes exactly once`;
+function validateElementRecords(elements, nodeIds) {
+  const issues = createDuplicateRowIssues(elements, 'elements', 'ID');
+
+  for (let index = 0; index < elements.length; index += 1) {
+    const element = elements[index];
+
+    if (!Number.isInteger(element?.node1) || element.node1 <= 0 || !nodeIds.has(element.node1)) {
+      issues.push(createValidationIssue('elements', index, 'node1', 'must reference an existing NODES ID'));
     }
-    if (extraCheck && !extraCheck(record)) {
-      return `${label} contains invalid values`;
+    if (!Number.isInteger(element?.node2) || element.node2 <= 0 || !nodeIds.has(element.node2)) {
+      issues.push(createValidationIssue('elements', index, 'node2', 'must reference an existing NODES ID'));
     }
-    seen.add(key);
+    if (
+      Number.isInteger(element?.node1) &&
+      Number.isInteger(element?.node2) &&
+      element.node1 > 0 &&
+      element.node2 > 0 &&
+      element.node1 === element.node2
+    ) {
+      issues.push(createValidationIssue('elements', index, 'node2', 'must connect to a different node'));
+    }
+    if (!Number.isFinite(element?.E) || element.E <= 0) {
+      issues.push(createValidationIssue('elements', index, 'E', 'must be a positive finite number'));
+    }
+    if (!Number.isFinite(element?.A) || element.A <= 0) {
+      issues.push(createValidationIssue('elements', index, 'A', 'must be a positive finite number'));
+    }
   }
-  return null;
+
+  return issues;
+}
+
+function validateNodeReferenceRecords(records, sectionKey, nodeIds, numericFields) {
+  const issues = [];
+  const seenNodes = new Map();
+  const duplicateFlagged = new Set();
+
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    const nodeId = record?.node;
+
+    if (!Number.isInteger(nodeId) || nodeId <= 0 || !nodeIds.has(nodeId)) {
+      issues.push(createValidationIssue(sectionKey, index, 'node', 'must reference an existing NODES ID'));
+    } else {
+      const previousIndex = seenNodes.get(nodeId);
+      if (previousIndex !== undefined) {
+        if (!duplicateFlagged.has(previousIndex)) {
+          issues.push(
+            createValidationIssue(
+              sectionKey,
+              previousIndex,
+              'node',
+              `must be unique within ${SECTION_LABELS[sectionKey]}`
+            )
+          );
+          duplicateFlagged.add(previousIndex);
+        }
+        issues.push(
+          createValidationIssue(sectionKey, index, 'node', `must be unique within ${SECTION_LABELS[sectionKey]}`)
+        );
+        duplicateFlagged.add(index);
+      } else {
+        seenNodes.set(nodeId, index);
+      }
+    }
+
+    for (const fieldName of numericFields) {
+      const value = record?.[fieldName];
+      if (!Number.isFinite(value)) {
+        issues.push(createValidationIssue(sectionKey, index, fieldName, 'must be a finite number'));
+      }
+    }
+  }
+
+  return issues;
+}
+
+function validateConstraintRecords(constraints, nodeIds) {
+  const issues = validateNodeReferenceRecords(constraints, 'constraints', nodeIds, []);
+
+  for (let index = 0; index < constraints.length; index += 1) {
+    const constraint = constraints[index];
+    if (!Number.isInteger(constraint?.fix_x) || (constraint.fix_x !== 0 && constraint.fix_x !== 1)) {
+      issues.push(createValidationIssue('constraints', index, 'fix_x', 'must be 0 or 1'));
+    }
+    if (!Number.isInteger(constraint?.fix_y) || (constraint.fix_y !== 0 && constraint.fix_y !== 1)) {
+      issues.push(createValidationIssue('constraints', index, 'fix_y', 'must be 0 or 1'));
+    }
+  }
+
+  return issues;
 }
 
 function validateModel(model) {
-  const errors = [];
+  const issues = [];
 
   if (!model || typeof model !== 'object') {
-    return { valid: false, errors: ['Model must be an object'] };
+    return { valid: false, errors: ['Model must be an object'], details: [] };
   }
 
   const nodes = Array.isArray(model.nodes) ? model.nodes : null;
@@ -258,93 +385,38 @@ function validateModel(model) {
   }
 
   if (missingArrays.length > 0) {
-    errors.push(`Model must include ${missingArrays.join(', ')} arrays`);
-    return { valid: false, errors };
+    return {
+      valid: false,
+      errors: [`Model must include ${missingArrays.join(', ')} arrays`],
+      details: [],
+    };
   }
 
   if (nodes.length < 1) {
-    errors.push('Model must contain at least one node');
+    issues.push(createValidationIssue('nodes', null, null, 'requires at least 1 row'));
   }
   if (elements.length < 1) {
-    errors.push('Model must contain at least one element');
-  }
-  if (nodes.length > MAX_NODES) {
-    errors.push(`Model cannot contain more than ${MAX_NODES} nodes`);
-  }
-  if (elements.length > MAX_ELEMENTS) {
-    errors.push(`Model cannot contain more than ${MAX_ELEMENTS} elements`);
-  }
-  if (loads.length > MAX_LOADS) {
-    errors.push(`Model cannot contain more than ${MAX_LOADS} loads`);
-  }
-  if (constraints.length > MAX_CONSTRAINTS) {
-    errors.push(`Model cannot contain more than ${MAX_CONSTRAINTS} constraints`);
+    issues.push(createValidationIssue('elements', null, null, 'requires at least 1 row'));
   }
 
-  const nodeIds = validateNodeMap(nodes);
-  if (nodeIds instanceof Set) {
-    const elementIdsError = validateUniqueIds(elements, 'Element');
-    if (elementIdsError) {
-      errors.push(elementIdsError);
+  for (const [sectionKey, limit] of Object.entries(SECTION_LIMITS)) {
+    const records = model[sectionKey];
+    if (records.length > limit) {
+      issues.push(createValidationIssue(sectionKey, null, null, `count ${records.length} exceeds limit ${limit}`));
     }
-
-    for (const element of elements) {
-      if (
-        !Number.isInteger(element.id) ||
-        element.id <= 0 ||
-        !Number.isInteger(element.node1) ||
-        !Number.isInteger(element.node2) ||
-        !nodeIds.has(element.node1) ||
-        !nodeIds.has(element.node2)
-      ) {
-        errors.push('Elements must reference existing nodes');
-        break;
-      }
-      if (!Number.isFinite(element.E) || !Number.isFinite(element.A) || element.E <= 0 || element.A <= 0) {
-        errors.push('Elements must have positive finite E and A');
-        break;
-      }
-      if (element.node1 === element.node2) {
-        errors.push('Elements must connect two different nodes');
-        break;
-      }
-    }
-
-    const loadError = validateRefRecords(loads, nodeIds, 'Loads', (record) =>
-      Number.isFinite(record.fx) && Number.isFinite(record.fy)
-    );
-    if (loadError) {
-      errors.push(loadError);
-    }
-
-    const constraintError = validateRefRecords(
-      constraints,
-      nodeIds,
-      'Constraints',
-      (record) =>
-        (record.fix_x === 0 || record.fix_x === 1) &&
-        (record.fix_y === 0 || record.fix_y === 1)
-    );
-    if (constraintError) {
-      errors.push(constraintError);
-    }
-
-    for (const record of constraints) {
-      if (
-        !Number.isInteger(record.fix_x) ||
-        !Number.isInteger(record.fix_y) ||
-        (record.fix_x !== 0 && record.fix_x !== 1) ||
-        (record.fix_y !== 0 && record.fix_y !== 1)
-      ) {
-        errors.push('Constraint fix values must be 0 or 1');
-        break;
-      }
-    }
-  } else {
-    errors.push(nodeIds);
   }
 
-  return { valid: errors.length === 0, errors };
+  const { nodeIds, issues: nodeIssues } = validateNodeMap(nodes);
+  issues.push(...nodeIssues);
+  issues.push(...validateElementRecords(elements, nodeIds));
+  issues.push(...validateNodeReferenceRecords(loads, 'loads', nodeIds, ['fx', 'fy']));
+  issues.push(...validateConstraintRecords(constraints, nodeIds));
+
+  return {
+    valid: issues.length === 0,
+    errors: issues.map((issue) => issue.message),
+    details: issues,
+  };
 }
 
 function serializeModel(model) {
@@ -417,7 +489,11 @@ CONSTRAINTS 3
 const BROWSER_SECTION_CONFIG = [
   {
     key: 'nodes',
+    title: 'NODES',
+    limit: MAX_NODES,
     rowsId: 'nodes-rows',
+    countId: 'nodes-count',
+    addButtonId: 'add-node-button',
     columnCount: 4,
     placeholder: '暂无节点，点击“新增节点”开始编辑。',
     fields: [
@@ -431,7 +507,11 @@ const BROWSER_SECTION_CONFIG = [
   },
   {
     key: 'elements',
+    title: 'ELEMENTS',
+    limit: MAX_ELEMENTS,
     rowsId: 'elements-rows',
+    countId: 'elements-count',
+    addButtonId: 'add-element-button',
     columnCount: 6,
     placeholder: '暂无单元，点击“新增单元”开始编辑。',
     fields: [
@@ -455,7 +535,11 @@ const BROWSER_SECTION_CONFIG = [
   },
   {
     key: 'loads',
+    title: 'LOADS',
+    limit: MAX_LOADS,
     rowsId: 'loads-rows',
+    countId: 'loads-count',
+    addButtonId: 'add-load-button',
     columnCount: 4,
     placeholder: '暂无荷载，点击“新增荷载”开始编辑。',
     fields: [
@@ -473,7 +557,11 @@ const BROWSER_SECTION_CONFIG = [
   },
   {
     key: 'constraints',
+    title: 'CONSTRAINTS',
+    limit: MAX_CONSTRAINTS,
     rowsId: 'constraints-rows',
+    countId: 'constraints-count',
+    addButtonId: 'add-constraint-button',
     columnCount: 4,
     placeholder: '暂无约束，点击“新增约束”开始编辑。',
     fields: [
@@ -506,6 +594,7 @@ function createBrowserState() {
     model: createEmptyModel(),
     fileName: 'custom.model',
     lastError: '',
+    invalidRowSignature: '',
   };
 }
 
@@ -526,6 +615,8 @@ function getBrowserDom(doc) {
   for (const section of BROWSER_SECTION_CONFIG) {
     dom[section.key] = doc.getElementById(section.key);
     dom[section.rowsId] = doc.getElementById(section.rowsId);
+    dom[section.countId] = doc.getElementById(section.countId);
+    dom[section.addButtonId] = doc.getElementById(section.addButtonId);
   }
 
   return dom;
@@ -565,6 +656,45 @@ function parseBrowserValue(rawValue, valueType) {
   return value === null ? Number.NaN : value;
 }
 
+function isModelBlank(model) {
+  return BROWSER_SECTION_CONFIG.every(
+    (section) => Array.isArray(model[section.key]) && model[section.key].length === 0
+  );
+}
+
+function createInvalidRowMap(validation) {
+  const rowMap = {};
+  for (const section of BROWSER_SECTION_CONFIG) {
+    rowMap[section.key] = new Set();
+  }
+  for (const issue of validation.details ?? []) {
+    if (!Number.isInteger(issue.rowIndex) || !rowMap[issue.sectionKey]) {
+      continue;
+    }
+    rowMap[issue.sectionKey].add(issue.rowIndex);
+  }
+  return rowMap;
+}
+
+function getInvalidRowSignature(rowMap) {
+  return BROWSER_SECTION_CONFIG.map((section) => {
+    const indices = [...(rowMap[section.key] ?? [])].sort((left, right) => left - right);
+    return `${section.key}:${indices.join(',')}`;
+  }).join('|');
+}
+
+function updateSectionCapacityState(dom, model) {
+  for (const section of BROWSER_SECTION_CONFIG) {
+    const count = Array.isArray(model[section.key]) ? model[section.key].length : 0;
+    if (dom[section.countId]) {
+      dom[section.countId].textContent = `${count}/${section.limit}`;
+    }
+    if (dom[section.addButtonId]) {
+      dom[section.addButtonId].disabled = count >= section.limit;
+    }
+  }
+}
+
 function renderFieldControl(field, value, index) {
   if (field.inputType === 'select') {
     const selectedValue = value === 0 || value === 1 ? String(value) : '';
@@ -584,7 +714,7 @@ function renderFieldControl(field, value, index) {
   );
 }
 
-function renderSectionRows(section, model, dom) {
+function renderSectionRows(section, model, dom, invalidRows = new Set()) {
   const rowsHost = dom[section.rowsId];
   if (!rowsHost) {
     return;
@@ -602,8 +732,9 @@ function renderSectionRows(section, model, dom) {
       const cells = section.fields
         .map((field) => `<td>${renderFieldControl(field, record[field.key], index)}</td>`)
         .join('');
+      const rowClassName = invalidRows.has(index) ? 'editor-row invalid-row' : 'editor-row';
       return (
-        `<tr>` +
+        `<tr class="${rowClassName}">` +
         `${cells}` +
         `<td><button type="button" class="row-action" data-action="delete-row" data-section="${section.key}" data-index="${index}">删除</button></td>` +
         `</tr>`
@@ -612,9 +743,9 @@ function renderSectionRows(section, model, dom) {
     .join('');
 }
 
-function renderAllSections(dom, model) {
+function renderAllSections(dom, model, invalidRowMap = {}) {
   for (const section of BROWSER_SECTION_CONFIG) {
-    renderSectionRows(section, model, dom);
+    renderSectionRows(section, model, dom, invalidRowMap[section.key] ?? new Set());
   }
 }
 
@@ -628,6 +759,70 @@ function updateStatusPanels(dom, state) {
   if (dom.commandPreview) {
     dom.commandPreview.textContent = buildCommand(effectiveFileName);
   }
+
+  const invalidRowMap = createInvalidRowMap(validation);
+  const invalidRowSignature = getInvalidRowSignature(invalidRowMap);
+  const blankModel = isModelBlank(state.model);
+  updateSectionCapacityState(dom, state.model);
+
+  if (state.invalidRowSignature !== invalidRowSignature) {
+    renderAllSections(dom, state.model, invalidRowMap);
+    state.invalidRowSignature = invalidRowSignature;
+  }
+
+  if (validation.valid) {
+    const serialized = serializeModel(state.model);
+    if (dom.statusMessage) {
+      dom.statusMessage.className = 'status status--ok';
+      dom.statusMessage.textContent =
+        `Model is ready to export. ` +
+        `${state.model.nodes.length} node(s), ` +
+        `${state.model.elements.length} element(s), ` +
+        `${state.model.loads.length} load(s), ` +
+        `${state.model.constraints.length} constraint record(s).`;
+    }
+    if (dom.errorMessage) {
+      if (state.lastError) {
+        dom.errorMessage.className = 'status status--error';
+        dom.errorMessage.textContent = state.lastError;
+      } else {
+        dom.errorMessage.className = 'status status--hidden';
+        dom.errorMessage.textContent = '';
+      }
+    }
+    if (dom.serializedPreview) {
+      dom.serializedPreview.textContent = serialized;
+    }
+    if (dom.exportModelButton) {
+      dom.exportModelButton.disabled = false;
+    }
+    return;
+  }
+
+  if (dom.statusMessage) {
+    dom.statusMessage.className = blankModel && !state.lastError ? 'status status--muted' : 'status status--error';
+    dom.statusMessage.textContent =
+      blankModel && !state.lastError
+        ? 'Add nodes and elements to enable export.'
+        : `Model cannot be exported yet. ${validation.errors.length} issue(s) need attention.`;
+  }
+  if (dom.errorMessage) {
+    if (blankModel && !state.lastError) {
+      dom.errorMessage.className = 'status status--hidden';
+      dom.errorMessage.textContent = '';
+    } else {
+      dom.errorMessage.className = 'status status--error';
+      dom.errorMessage.textContent = state.lastError || validation.errors.join('; ');
+    }
+  }
+  if (dom.serializedPreview) {
+    dom.serializedPreview.textContent =
+      '# Current model is invalid and cannot be exported.\n' + validation.errors.join('\n');
+  }
+  if (dom.exportModelButton) {
+    dom.exportModelButton.disabled = true;
+  }
+  return;
 
   if (validation.valid) {
     const serialized = serializeModel(state.model);
@@ -672,6 +867,7 @@ function updateStatusPanels(dom, state) {
 function replaceModel(state, dom, nextModel) {
   state.model = nextModel;
   state.lastError = '';
+  state.invalidRowSignature = '';
   renderAllSections(dom, state.model);
   updateStatusPanels(dom, state);
 }
@@ -683,6 +879,9 @@ function applyImportText(text, state, dom) {
     updateStatusPanels(dom, state);
     return false;
   }
+
+  replaceModel(state, dom, parsed.model);
+  return validateModel(parsed.model).valid;
 
   const validation = validateModel(parsed.model);
   if (!validation.valid) {
@@ -728,6 +927,10 @@ function handleSectionClick(section, event, state, dom) {
   }
 
   if (target.dataset.action === 'add-row') {
+    if (state.model[section.key].length >= section.limit) {
+      updateStatusPanels(dom, state);
+      return;
+    }
     state.model[section.key].push(section.createRow(state.model));
     state.lastError = '';
     renderSectionRows(section, state.model, dom);

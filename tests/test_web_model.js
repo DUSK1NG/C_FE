@@ -62,6 +62,76 @@ function makeValidModel() {
   };
 }
 
+function cloneModel(model) {
+  return JSON.parse(JSON.stringify(model));
+}
+
+function renderModelTextUnchecked(model) {
+  const lines = [];
+  lines.push(`NODES ${model.nodes.length}`);
+  for (const node of model.nodes) {
+    lines.push(`${node.id} ${node.x} ${node.y}`);
+  }
+  lines.push('');
+  lines.push(`ELEMENTS ${model.elements.length}`);
+  for (const element of model.elements) {
+    lines.push(`${element.id} ${element.node1} ${element.node2} ${element.E} ${element.A}`);
+  }
+  lines.push('');
+  lines.push(`LOADS ${model.loads.length}`);
+  for (const load of model.loads) {
+    lines.push(`${load.node} ${load.fx} ${load.fy}`);
+  }
+  lines.push('');
+  lines.push(`CONSTRAINTS ${model.constraints.length}`);
+  for (const constraint of model.constraints) {
+    lines.push(`${constraint.node} ${constraint.fix_x} ${constraint.fix_y}`);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function makeMaxCapacityModel() {
+  const nodes = Array.from({ length: 10 }, (_, index) => ({
+    id: index + 1,
+    x: index * 1000,
+    y: index % 2 === 0 ? 0 : 500,
+  }));
+  const elements = [];
+  let elementId = 1;
+  for (let node1 = 1; node1 <= nodes.length && elements.length < 20; node1 += 1) {
+    for (let node2 = node1 + 1; node2 <= nodes.length && elements.length < 20; node2 += 1) {
+      elements.push({
+        id: elementId,
+        node1,
+        node2,
+        E: 210000 + elementId,
+        A: 100 + elementId,
+      });
+      elementId += 1;
+    }
+  }
+  const loads = Array.from({ length: 10 }, (_, index) => ({
+    node: index + 1,
+    fx: 0,
+    fy: -1000 * (index + 1),
+  }));
+  const constraints = Array.from({ length: 10 }, (_, index) => ({
+    node: index + 1,
+    fix_x: index % 2,
+    fix_y: (index + 1) % 2,
+  }));
+  return { nodes, elements, loads, constraints };
+}
+
+function makeOverCapacityNodeImportText() {
+  const maxModel = makeMaxCapacityModel();
+  return renderModelTextUnchecked({
+    ...maxModel,
+    nodes: [...maxModel.nodes, { id: 11, x: 10000, y: 0 }],
+  });
+}
+
 function escapeHtml(text) {
   return String(text)
     .replace(/&/g, '&amp;')
@@ -163,12 +233,20 @@ function loadAppWithFakeDom() {
     'load-example-button',
     'import-model-button',
     'export-model-button',
+    'add-node-button',
+    'add-element-button',
+    'add-load-button',
+    'add-constraint-button',
     'file-name-input',
     'import-model-input',
     'status-message',
     'error-message',
     'serialized-preview',
     'command-preview',
+    'nodes-count',
+    'elements-count',
+    'loads-count',
+    'constraints-count',
     'nodes',
     'nodes-rows',
     'elements',
@@ -353,6 +431,16 @@ CONSTRAINTS 1
 `,
   'duplicate node IDs'
 );
+assert.match(
+  validateModel({
+    ...makeValidModel(),
+    nodes: [
+      { id: 1, x: 0, y: 0 },
+      { id: 1, x: 1000, y: 0 },
+    ],
+  }).errors.join('\n'),
+  /NODES.*ID/i
+);
 
 assertInvalidModelFromText(
   `NODES 2
@@ -385,6 +473,13 @@ CONSTRAINTS 1
 1 1 1
 `,
   'unknown element node references'
+);
+assert.match(
+  validateModel({
+    ...makeValidModel(),
+    elements: [{ id: 1, node1: 1, node2: 999, E: 210000, A: 100 }],
+  }).errors.join('\n'),
+  /ELEMENTS.*node/i
 );
 
 assertInvalidModelFromText(
@@ -437,6 +532,13 @@ CONSTRAINTS 1
 `,
   'non-positive E'
 );
+assert.match(
+  validateModel({
+    ...makeValidModel(),
+    elements: [{ id: 1, node1: 1, node2: 2, E: 0, A: 100 }],
+  }).errors.join('\n'),
+  /ELEMENTS.*\bE\b/i
+);
 
 assertInvalidModelFromText(
   `NODES 2
@@ -469,6 +571,13 @@ CONSTRAINTS 1
 `,
   'invalid constraint values'
 );
+assert.match(
+  validateModel({
+    ...makeValidModel(),
+    constraints: [{ node: 1, fix_x: 2, fix_y: 1 }],
+  }).errors.join('\n'),
+  /CONSTRAINTS.*fix_[xy]/i
+);
 
 assertInvalidModelFromText(
   `NODES 2
@@ -494,6 +603,7 @@ const tooManyNodesValidation = validateModel({
 });
 assert.equal(tooManyNodesValidation.valid, false);
 assert.ok(tooManyNodesValidation.errors.length > 0);
+assert.match(tooManyNodesValidation.errors.join('\n'), /NODES.*10/i);
 
 const tooManyElementsValidation = validateModel({
   ...tooManyNodes.model,
@@ -504,6 +614,7 @@ const tooManyElementsValidation = validateModel({
 });
 assert.equal(tooManyElementsValidation.valid, false);
 assert.ok(tooManyElementsValidation.errors.length > 0);
+assert.match(tooManyElementsValidation.errors.join('\n'), /ELEMENTS.*20/i);
 
 const mediumParsed = parseModel(mediumSource);
 assert.equal(mediumParsed.ok, true, mediumParsed.error);
@@ -523,6 +634,7 @@ const tooManyLoadsValidation = validateModel({
 });
 assert.equal(tooManyLoadsValidation.valid, false);
 assert.ok(tooManyLoadsValidation.errors.length > 0);
+assert.match(tooManyLoadsValidation.errors.join('\n'), /LOADS.*10/i);
 
 const tooManyConstraintsValidation = validateModel({
   ...mediumParsed.model,
@@ -542,6 +654,7 @@ const tooManyConstraintsValidation = validateModel({
 });
 assert.equal(tooManyConstraintsValidation.valid, false);
 assert.ok(tooManyConstraintsValidation.errors.length > 0);
+assert.match(tooManyConstraintsValidation.errors.join('\n'), /CONSTRAINTS.*10/i);
 
 for (const missingField of ['nodes', 'elements', 'loads', 'constraints']) {
   const incompleteModel = makeValidModel();
@@ -631,6 +744,10 @@ const browserRuntime = loadAppWithFakeDom();
 assert.equal(browserRuntime.fakeDocument.body.dataset.webModelEditorReady, 'true');
 assert.deepEqual(browserRuntime.fakeWindow.webModelEditor.state.model, createEmptyModel());
 assert.equal(browserRuntime.fakeWindow.webModelEditor.dom.nodes.id, 'nodes');
+assert.equal(browserRuntime.elements.get('nodes-count').textContent, '0/10');
+assert.equal(browserRuntime.elements.get('elements-count').textContent, '0/20');
+assert.equal(browserRuntime.elements.get('loads-count').textContent, '0/10');
+assert.equal(browserRuntime.elements.get('constraints-count').textContent, '0/10');
 assert.equal(
   browserRuntime.elements.get('status-message').textContent.length > 0,
   true,
@@ -641,6 +758,8 @@ assert.equal(
   buildCommand('custom.model')
 );
 assert.equal(browserRuntime.elements.get('export-model-button').disabled, true);
+assert.doesNotMatch(browserRuntime.elements.get('error-message').className, /status--error/);
+assert.equal(browserRuntime.elements.get('error-message').textContent, '');
 for (const rowsId of ['nodes-rows', 'elements-rows', 'loads-rows', 'constraints-rows']) {
   assert.equal(
     browserRuntime.elements.get(rowsId).innerHTML.length > 0,
@@ -674,6 +793,25 @@ async function runBrowserWorkflowAssertions() {
     assert.equal(elements.get('serialized-preview').textContent, serializedTriangle);
     assert.equal(elements.get('export-model-button').disabled, false);
     assert.match(elements.get('nodes-rows').innerHTML, /value="500"/);
+    assert.equal(elements.get('nodes-count').textContent, '3/10');
+    assert.equal(elements.get('elements-count').textContent, '3/20');
+    assert.equal(elements.get('loads-count').textContent, '1/10');
+    assert.equal(elements.get('constraints-count').textContent, '3/10');
+
+    const duplicateNodeIdInput = {
+      dataset: { action: 'edit-field', index: '2', field: 'id' },
+      value: '2',
+    };
+    await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
+    assert.equal(elements.get('export-model-button').disabled, true);
+    assert.match(elements.get('error-message').textContent, /NODES.*ID/i);
+    assert.match(elements.get('nodes-rows').innerHTML, /class="[^"]*invalid[^"]*"/i);
+
+    duplicateNodeIdInput.value = '3';
+    await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
+    assert.equal(elements.get('export-model-button').disabled, false);
+    assert.equal(elements.get('error-message').textContent, '');
+    assert.doesNotMatch(elements.get('nodes-rows').innerHTML, /class="[^"]*invalid[^"]*"/i);
 
     const nodesBeforeEdit = elements.get('nodes-rows').innerHTML;
     const elementsBeforeEdit = elements.get('elements-rows').innerHTML;
@@ -748,6 +886,92 @@ CONSTRAINTS 0
     });
     assert.deepEqual(fakeWindow.webModelEditor.state.model, modelBeforeFailedImport);
     assert.match(elements.get('error-message').textContent, /element/i);
+
+    const maxCapacityModel = makeMaxCapacityModel();
+    elements.get('import-model-input').files = [
+      {
+        name: 'max-capacity.model',
+        async text() {
+          return serializeModel(maxCapacityModel);
+        },
+      },
+    ];
+    await dispatchEvent(elements.get('import-model-input'), 'change', {
+      target: elements.get('import-model-input'),
+    });
+    assert.deepEqual(fakeWindow.webModelEditor.state.model, maxCapacityModel);
+    assert.equal(elements.get('nodes-count').textContent, '10/10');
+    assert.equal(elements.get('elements-count').textContent, '20/20');
+    assert.equal(elements.get('loads-count').textContent, '10/10');
+    assert.equal(elements.get('constraints-count').textContent, '10/10');
+    for (const addButtonId of [
+      'add-node-button',
+      'add-element-button',
+      'add-load-button',
+      'add-constraint-button',
+    ]) {
+      assert.equal(elements.get(addButtonId).disabled, true, `${addButtonId} should be disabled at limit`);
+    }
+    const exactCapacitySnapshot = cloneModel(fakeWindow.webModelEditor.state.model);
+    await dispatchEvent(elements.get('nodes'), 'click', {
+      target: {
+        dataset: { action: 'add-row', section: 'nodes' },
+      },
+    });
+    await dispatchEvent(elements.get('elements'), 'click', {
+      target: {
+        dataset: { action: 'add-row', section: 'elements' },
+      },
+    });
+    await dispatchEvent(elements.get('loads'), 'click', {
+      target: {
+        dataset: { action: 'add-row', section: 'loads' },
+      },
+    });
+    await dispatchEvent(elements.get('constraints'), 'click', {
+      target: {
+        dataset: { action: 'add-row', section: 'constraints' },
+      },
+    });
+    assert.deepEqual(fakeWindow.webModelEditor.state.model, exactCapacitySnapshot);
+
+    const overCapacityImportText = makeOverCapacityNodeImportText();
+    const overCapacityParsed = parseModel(overCapacityImportText);
+    assert.equal(overCapacityParsed.ok, true, overCapacityParsed.error);
+    elements.get('import-model-input').files = [
+      {
+        name: 'over-capacity.model',
+        async text() {
+          return overCapacityImportText;
+        },
+      },
+    ];
+    await dispatchEvent(elements.get('import-model-input'), 'change', {
+      target: elements.get('import-model-input'),
+    });
+    assert.deepEqual(fakeWindow.webModelEditor.state.model, overCapacityParsed.model);
+    assert.equal(elements.get('export-model-button').disabled, true);
+    assert.match(elements.get('error-message').textContent, /NODES.*10/i);
+    assert.equal(elements.get('nodes-count').textContent, '11/10');
+    assert.throws(
+      () => serializeModel(overCapacityParsed.model),
+      (error) => error instanceof Error && /NODES.*10/i.test(error.message)
+    );
+    await dispatchEvent(elements.get('export-model-button'), 'click');
+    assert.equal(createdObjectUrls.length, 0);
+
+    elements.get('import-model-input').files = [
+      {
+        name: 'triangle.model',
+        async text() {
+          return triangleSource;
+        },
+      },
+    ];
+    await dispatchEvent(elements.get('import-model-input'), 'change', {
+      target: elements.get('import-model-input'),
+    });
+    assert.deepEqual(fakeWindow.webModelEditor.state.model, triangleParsed.model);
 
     elements.get('file-name-input').value = '<img src=x onerror=1>.model';
     await dispatchEvent(elements.get('file-name-input'), 'input', {

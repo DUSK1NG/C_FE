@@ -118,6 +118,13 @@ button:disabled {
   margin: 0 0 0.5rem;
 }
 
+.section-count {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .hero-copy {
   margin: 0;
   max-width: 70ch;
@@ -183,6 +190,16 @@ button:disabled {
   color: var(--error-text);
 }
 
+.status--muted {
+  background: #f8fafc;
+  border-color: #d5def0;
+  color: var(--text-muted);
+}
+
+.status--hidden {
+  display: none;
+}
+
 #serialized-preview,
 #command-preview {
   display: block;
@@ -245,6 +262,16 @@ thead th {
 
 tbody tr:last-child td {
   border-bottom: none;
+}
+
+.invalid-row td {
+  background: rgba(185, 28, 28, 0.08);
+}
+
+.invalid-row input,
+.invalid-row select {
+  border-color: #ef4444;
+  background: #fff5f5;
 }
 
 input[type="number"],
