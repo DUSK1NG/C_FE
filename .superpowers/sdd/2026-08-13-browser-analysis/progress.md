@@ -21,4 +21,7 @@ Task 3: fix round 1/5 (1 addressed; commits 266c377..b4631ff).
 Task 3: fix round 2/5 (1 addressed, 0 open; commits b4631ff..6b478db).
 Task 3: complete (commits aca09c8..6b478db, review clean).
 Task 4: complete (commits 6b478db..8221517, review clean).
+Task 5: complete (commits 8221517..2d4bee9, verification clean).
+Final review fix wave: 3 findings addressed in `efa1e19`; scoped re-review clean.
+Final verification after fixes: web tests passed; C11 13/13 targets passed; `git diff --check` passed.
 Task 5: complete (commits 8221517..HEAD, verification clean).
