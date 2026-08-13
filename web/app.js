@@ -360,11 +360,16 @@ function serializeModel(model) {
   return lines.join('\n');
 }
 
+function quoteShellArgument(value) {
+  const text = String(value);
+  return `'${text.split("'").join("'\"'\"'")}'`;
+}
+
 function buildCommand(fileName) {
   if (fileName === undefined || fileName === null || fileName === '') {
     return 'fem --input';
   }
-  return `fem --input ${fileName}`;
+  return `fem --input ${quoteShellArgument(fileName)}`;
 }
 
 function initBrowserApp() {

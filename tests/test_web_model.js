@@ -1,5 +1,10 @@
 const assert = require('node:assert/strict');
-const { parseModel, validateModel, serializeModel } = require('../web/app.js');
+const {
+  buildCommand,
+  parseModel,
+  validateModel,
+  serializeModel,
+} = require('../web/app.js');
 
 const source = `NODES 2
 1 0 0
@@ -22,4 +27,9 @@ assert.equal(parsed.model.nodes.length, 2);
 assert.equal(validateModel(parsed.model).valid, true);
 assert.match(serializeModel(parsed.model), /NODES 2/);
 assert.match(serializeModel(parsed.model), /CONSTRAINTS 2/);
+assert.equal(buildCommand('my model.model'), "fem --input 'my model.model'");
+assert.equal(
+  buildCommand('unsafe;$(echo pwned).model'),
+  "fem --input 'unsafe;$(echo pwned).model'"
+);
 console.log('web model tests passed');
