@@ -2,6 +2,38 @@
 
 本仓库提供一个固定容量、无动态内存分配的二维桁架有限元示例实现。当前 Stage 1–10 已完成，既保留了 Stage 1 的单元演示模式，也提供了统一的本地命令行工作流，可直接读取 `.model` 文件并输出 TXT、Markdown、CSV 结果。
 
+## 快速开始
+
+在仓库根目录执行以下命令即可编译并运行中型示例。
+
+### Windows PowerShell（MSYS2 UCRT64）
+
+```powershell
+$gcc = "C:\msys64\ucrt64\bin\gcc.exe"
+& $gcc -std=c11 -Wall -Wextra -pedantic `
+  src\main.c src\cli.c src\pipeline.c src\fem.c src\solver.c `
+  src\reactions.c src\postprocess.c src\io.c src\output.c `
+  -Iinclude -o fem.exe -lm
+
+New-Item -ItemType Directory -Force results | Out-Null
+& .\fem.exe --input .\tests\data\medium.model `
+  --output-dir .\results --prefix medium
+```
+
+### Linux / macOS
+
+```bash
+gcc -std=c11 -Wall -Wextra -pedantic \
+  src/main.c src/cli.c src/pipeline.c src/fem.c src/solver.c \
+  src/reactions.c src/postprocess.c src/io.c src/output.c \
+  -Iinclude -o fem -lm
+
+mkdir -p results
+./fem --input tests/data/medium.model --output-dir results --prefix medium
+```
+
+运行后会在 `results/` 目录生成 `medium.txt`、`medium.md` 和 `medium.csv`。
+
 ## 项目范围
 
 - 平面桁架，每个节点 2 个平移自由度。
@@ -50,7 +82,7 @@ open web/index.html
 
 网页只负责在浏览器内编辑、校验、预览和下载模型。当前版本是无服务器的静态页面，**不会也不能从浏览器直接执行 `fem` 或 `fem.exe`**；求解仍需在仓库根目录的终端中运行。字段、容量、导入/导出规则和完整使用流程见 [`web/README.md`](web/README.md)。
 
-## 快速开始
+## 详细编译与运行
 
 ### Windows PowerShell（MSYS2 UCRT64）
 
