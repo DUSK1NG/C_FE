@@ -240,11 +240,25 @@ function validateModel(model) {
 
   const nodes = Array.isArray(model.nodes) ? model.nodes : null;
   const elements = Array.isArray(model.elements) ? model.elements : null;
-  const loads = Array.isArray(model.loads) ? model.loads : [];
-  const constraints = Array.isArray(model.constraints) ? model.constraints : [];
+  const loads = Array.isArray(model.loads) ? model.loads : null;
+  const constraints = Array.isArray(model.constraints) ? model.constraints : null;
 
-  if (!nodes || !elements) {
-    errors.push('Model must include nodes and elements arrays');
+  const missingArrays = [];
+  if (!nodes) {
+    missingArrays.push('nodes');
+  }
+  if (!elements) {
+    missingArrays.push('elements');
+  }
+  if (!loads) {
+    missingArrays.push('loads');
+  }
+  if (!constraints) {
+    missingArrays.push('constraints');
+  }
+
+  if (missingArrays.length > 0) {
+    errors.push(`Model must include ${missingArrays.join(', ')} arrays`);
     return { valid: false, errors };
   }
 

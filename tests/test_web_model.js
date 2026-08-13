@@ -43,6 +43,24 @@ function assertInvalidModelFromText(input, label) {
   assert.ok(validation.errors.length > 0, `${label} should report validation errors`);
 }
 
+function makeValidModel() {
+  return {
+    nodes: [
+      { id: 1, x: 0, y: 0 },
+      { id: 2, x: 1000, y: 0 },
+    ],
+    elements: [
+      { id: 1, node1: 1, node2: 2, E: 210000, A: 100 },
+    ],
+    loads: [
+      { node: 2, fx: 0, fy: -1000 },
+    ],
+    constraints: [
+      { node: 1, fix_x: 1, fix_y: 1 },
+    ],
+  };
+}
+
 const parsed = parseModel(source);
 assert.equal(parsed.ok, true);
 assert.equal(parsed.model.nodes.length, 2);
@@ -235,6 +253,22 @@ assertInvalidModelFromText(
 2 1000 0
 
 ELEMENTS 1
+1 1 2 210000 0
+
+LOADS 0
+
+CONSTRAINTS 1
+1 1 1
+`,
+  'non-positive A'
+);
+
+assertInvalidModelFromText(
+  `NODES 2
+1 0 0
+2 1000 0
+
+ELEMENTS 1
 1 1 2 210000 100
 
 LOADS 0
@@ -317,6 +351,23 @@ const tooManyConstraintsValidation = validateModel({
 });
 assert.equal(tooManyConstraintsValidation.valid, false);
 assert.ok(tooManyConstraintsValidation.errors.length > 0);
+
+for (const missingField of ['nodes', 'elements', 'loads', 'constraints']) {
+  const incompleteModel = makeValidModel();
+  delete incompleteModel[missingField];
+
+  const validation = validateModel(incompleteModel);
+  assert.equal(validation.valid, false, `missing ${missingField} should fail validation`);
+  assert.ok(validation.errors.length > 0, `missing ${missingField} should report errors`);
+  assert.throws(
+    () => serializeModel(incompleteModel),
+    (error) =>
+      error instanceof Error &&
+      !(error instanceof TypeError) &&
+      error.message.length > 0,
+    `missing ${missingField} should throw a readable serialization error`
+  );
+}
 
 function runPowerShellQuotingProbe(fileName) {
   const command = buildCommand(fileName);
