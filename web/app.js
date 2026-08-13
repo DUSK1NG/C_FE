@@ -251,6 +251,9 @@ function validateModel(model) {
   if (nodes.length < 1) {
     errors.push('Model must contain at least one node');
   }
+  if (elements.length < 1) {
+    errors.push('Model must contain at least one element');
+  }
   if (nodes.length > MAX_NODES) {
     errors.push(`Model cannot contain more than ${MAX_NODES} nodes`);
   }
@@ -304,7 +307,9 @@ function validateModel(model) {
       constraints,
       nodeIds,
       'Constraints',
-      (record) => record.fix_x === 0 || record.fix_x === 1 || record.fix_y === 0 || record.fix_y === 1
+      (record) =>
+        (record.fix_x === 0 || record.fix_x === 1) &&
+        (record.fix_y === 0 || record.fix_y === 1)
     );
     if (constraintError) {
       errors.push(constraintError);
@@ -321,6 +326,8 @@ function validateModel(model) {
         break;
       }
     }
+  } else {
+    errors.push(nodeIds);
   }
 
   return { valid: errors.length === 0, errors };
