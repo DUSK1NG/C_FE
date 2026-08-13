@@ -22,6 +22,7 @@
           <button id="load-example-button" type="button">加载示例</button>
           <button id="import-model-button" type="button">导入 .model</button>
           <button id="export-model-button" type="button">导出 .model</button>
+          <button id="analyze-model-button" type="button">开始分析</button>
           <label class="toolbar-field" for="file-name-input">
             <span>导出文件名</span>
             <input id="file-name-input" type="text" value="custom.model" spellcheck="false">
@@ -146,6 +147,49 @@
             </table>
           </div>
         </section>
+      </section>
+
+      <section id="analysis-panel" class="analysis-panel analysis-panel--hidden" aria-labelledby="analysis-title">
+        <div class="analysis-header">
+          <div>
+            <p class="section-kicker">Browser analysis</p>
+            <h2 id="analysis-title">分析结果</h2>
+          </div>
+          <p id="analysis-status" class="status" aria-live="polite"></p>
+        </div>
+        <div class="results-grid">
+          <section class="results-card">
+            <h3>节点位移</h3>
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th scope="col">节点</th><th scope="col">Ux</th><th scope="col">Uy</th><th scope="col">合位移</th></tr></thead>
+                <tbody id="node-results-rows"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="results-card">
+            <h3>单元结果</h3>
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th scope="col">单元</th><th scope="col">长度</th><th scope="col">伸长</th><th scope="col">应变</th><th scope="col">应力</th><th scope="col">轴力</th><th scope="col">状态</th></tr></thead>
+                <tbody id="element-results-rows"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="results-card">
+            <h3>支座反力</h3>
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th scope="col">节点</th><th scope="col">Fx</th><th scope="col">Fy</th></tr></thead>
+                <tbody id="reaction-results-rows"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="results-card">
+            <h3>平衡汇总</h3>
+            <dl id="summary-results" class="summary-results"></dl>
+          </section>
+        </div>
       </section>
     </main>
 

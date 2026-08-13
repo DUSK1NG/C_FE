@@ -786,6 +786,7 @@ const BROWSER_SECTION_LOOKUP = Object.fromEntries(
 function createBrowserState() {
   return {
     model: createEmptyModel(),
+    analysis: null,
     fileName: 'custom.model',
     lastError: '',
     invalidRowSignature: '',
@@ -798,12 +799,19 @@ function getBrowserDom(doc) {
     loadExampleButton: doc.getElementById('load-example-button'),
     importModelButton: doc.getElementById('import-model-button'),
     exportModelButton: doc.getElementById('export-model-button'),
+    analyzeModelButton: doc.getElementById('analyze-model-button'),
     fileNameInput: doc.getElementById('file-name-input'),
     importModelInput: doc.getElementById('import-model-input'),
     statusMessage: doc.getElementById('status-message'),
     errorMessage: doc.getElementById('error-message'),
     serializedPreview: doc.getElementById('serialized-preview'),
     commandPreview: doc.getElementById('command-preview'),
+    analysisPanel: doc.getElementById('analysis-panel'),
+    analysisStatus: doc.getElementById('analysis-status'),
+    nodeResultsRows: doc.getElementById('node-results-rows'),
+    elementResultsRows: doc.getElementById('element-results-rows'),
+    reactionResultsRows: doc.getElementById('reaction-results-rows'),
+    summaryResults: doc.getElementById('summary-results'),
   };
 
   for (const section of BROWSER_SECTION_CONFIG) {
@@ -886,6 +894,129 @@ function updateSectionCapacityState(dom, model) {
     if (dom[section.addButtonId]) {
       dom[section.addButtonId].disabled = count >= section.limit;
     }
+  }
+}
+
+function formatAnalysisNumber(value) {
+  if (!Number.isFinite(value)) {
+    throw new Error('Analysis results must contain only finite numbers');
+  }
+  return value.toLocaleString('en-US', { maximumSignificantDigits: 6, useGrouping: false });
+}
+
+function renderAnalysisTables(dom, results) {
+  if (!results || typeof results !== 'object') {
+    throw new Error('Analysis did not return results');
+  }
+  const { nodeDisplacements, elementResults, reactions, summary } = results;
+  if (
+    !Array.isArray(nodeDisplacements) ||
+    !Array.isArray(elementResults) ||
+    !Array.isArray(reactions) ||
+    !summary ||
+    typeof summary !== 'object'
+  ) {
+    throw new Error('Analysis returned incomplete results');
+  }
+
+  const nodeRows = nodeDisplacements
+    .map(
+      (result) =>
+        `<tr><td>${escapeHtml(result.node)}</td><td>${escapeHtml(formatAnalysisNumber(result.ux))}</td>` +
+        `<td>${escapeHtml(formatAnalysisNumber(result.uy))}</td><td>${escapeHtml(formatAnalysisNumber(result.magnitude))}</td></tr>`
+    )
+    .join('');
+  const elementRows = elementResults
+    .map(
+      (result) =>
+        `<tr><td>${escapeHtml(result.element)}</td><td>${escapeHtml(formatAnalysisNumber(result.length))}</td>` +
+        `<td>${escapeHtml(formatAnalysisNumber(result.elongation))}</td><td>${escapeHtml(formatAnalysisNumber(result.strain))}</td>` +
+        `<td>${escapeHtml(formatAnalysisNumber(result.stress))}</td><td>${escapeHtml(formatAnalysisNumber(result.axialForce))}</td>` +
+        `<td>${escapeHtml(result.status)}</td></tr>`
+    )
+    .join('');
+  const reactionRows = reactions
+    .map(
+      (result) =>
+        `<tr><td>${escapeHtml(result.node)}</td><td>${escapeHtml(formatAnalysisNumber(result.fx))}</td>` +
+        `<td>${escapeHtml(formatAnalysisNumber(result.fy))}</td></tr>`
+    )
+    .join('');
+  const summaryRows = [
+    ['总荷载 Fx', summary.totalLoadX],
+    ['总荷载 Fy', summary.totalLoadY],
+    ['总反力 Fx', summary.totalReactionX],
+    ['总反力 Fy', summary.totalReactionY],
+    ['平衡残差 Fx', summary.residualX],
+    ['平衡残差 Fy', summary.residualY],
+    ['最大位移', summary.maxDisplacement],
+  ]
+    .map(
+      ([label, value]) =>
+        `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(formatAnalysisNumber(value))}</dd></div>`
+    )
+    .join('');
+
+  if (dom.nodeResultsRows) {
+    dom.nodeResultsRows.innerHTML = nodeRows;
+  }
+  if (dom.elementResultsRows) {
+    dom.elementResultsRows.innerHTML = elementRows;
+  }
+  if (dom.reactionResultsRows) {
+    dom.reactionResultsRows.innerHTML = reactionRows;
+  }
+  if (dom.summaryResults) {
+    dom.summaryResults.innerHTML = summaryRows;
+  }
+  if (dom.analysisStatus) {
+    dom.analysisStatus.className = 'status status--ok';
+    dom.analysisStatus.textContent = '分析完成';
+  }
+  if (dom.analysisPanel) {
+    dom.analysisPanel.className = 'analysis-panel';
+  }
+}
+
+function clearAnalysis(dom, state) {
+  state.analysis = null;
+  for (const rowsHost of [
+    dom.nodeResultsRows,
+    dom.elementResultsRows,
+    dom.reactionResultsRows,
+    dom.summaryResults,
+  ]) {
+    if (rowsHost) {
+      rowsHost.innerHTML = '';
+    }
+  }
+  if (dom.analysisStatus) {
+    dom.analysisStatus.className = 'status';
+    dom.analysisStatus.textContent = '';
+  }
+  if (dom.analysisPanel) {
+    dom.analysisPanel.className = 'analysis-panel analysis-panel--hidden';
+  }
+}
+
+function runAnalysis(state, dom) {
+  clearAnalysis(dom, state);
+  const analysis = analyzeModel(state.model);
+  if (!analysis.ok) {
+    state.lastError = analysis.error;
+    updateStatusPanels(dom, state);
+    return;
+  }
+
+  try {
+    state.analysis = { ok: true, results: JSON.parse(JSON.stringify(analysis.results)) };
+    renderAnalysisTables(dom, state.analysis.results);
+    state.lastError = '';
+    updateStatusPanels(dom, state);
+  } catch (error) {
+    clearAnalysis(dom, state);
+    state.lastError = error instanceof Error ? error.message : String(error);
+    updateStatusPanels(dom, state);
   }
 }
 
@@ -976,6 +1107,9 @@ function updateStatusPanels(dom, state) {
   const invalidRowSignature = getInvalidRowSignature(invalidRowMap);
   const blankModel = isModelBlank(state.model);
   updateSectionCapacityState(dom, state.model);
+  if (dom.analyzeModelButton) {
+    dom.analyzeModelButton.disabled = !validation.valid || blankModel;
+  }
 
   if (state.invalidRowSignature !== invalidRowSignature) {
     updateInvalidRowClasses(dom, state.model, invalidRowMap);
@@ -1036,6 +1170,7 @@ function updateStatusPanels(dom, state) {
 }
 
 function replaceModel(state, dom, nextModel) {
+  clearAnalysis(dom, state);
   state.model = nextModel;
   state.lastError = '';
   state.invalidRowSignature = '';
@@ -1077,6 +1212,7 @@ function updateSingleField(section, event, state, dom) {
     ...records[index],
     [fieldName]: parseBrowserValue(target.value, field.valueType),
   };
+  clearAnalysis(dom, state);
   state.lastError = '';
   updateStatusPanels(dom, state);
 }
@@ -1093,6 +1229,7 @@ function handleSectionClick(section, event, state, dom) {
       return;
     }
     state.model[section.key].push(section.createRow(state.model));
+    clearAnalysis(dom, state);
     state.lastError = '';
     renderSectionRows(section, state.model, dom);
     updateStatusPanels(dom, state);
@@ -1105,6 +1242,7 @@ function handleSectionClick(section, event, state, dom) {
       return;
     }
     state.model[section.key].splice(index, 1);
+    clearAnalysis(dom, state);
     state.lastError = '';
     renderSectionRows(section, state.model, dom);
     updateStatusPanels(dom, state);
@@ -1214,6 +1352,12 @@ function initBrowserApp() {
     });
   }
 
+  if (dom.analyzeModelButton) {
+    dom.analyzeModelButton.addEventListener('click', () => {
+      runAnalysis(state, dom);
+    });
+  }
+
   for (const section of Object.values(BROWSER_SECTION_LOOKUP)) {
     const sectionHost = dom[section.key];
     if (!sectionHost) {
@@ -1231,6 +1375,7 @@ function initBrowserApp() {
   }
 
   renderAllSections(dom, state.model);
+  clearAnalysis(dom, state);
   updateStatusPanels(dom, state);
 
   if (typeof window !== 'undefined') {

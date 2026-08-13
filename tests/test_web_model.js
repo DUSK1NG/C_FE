@@ -312,6 +312,7 @@ function loadAppWithFakeDom() {
     'load-example-button',
     'import-model-button',
     'export-model-button',
+    'analyze-model-button',
     'add-node-button',
     'add-element-button',
     'add-load-button',
@@ -322,6 +323,12 @@ function loadAppWithFakeDom() {
     'error-message',
     'serialized-preview',
     'command-preview',
+    'analysis-panel',
+    'analysis-status',
+    'node-results-rows',
+    'element-results-rows',
+    'reaction-results-rows',
+    'summary-results',
     'nodes-count',
     'elements-count',
     'loads-count',
@@ -868,10 +875,31 @@ for (const sectionId of ['nodes', 'elements', 'loads', 'constraints']) {
     `${sectionId} section should exist in index.html`
   );
 }
+for (const targetId of [
+  'analyze-model-button',
+  'analysis-panel',
+  'analysis-status',
+  'node-results-rows',
+  'element-results-rows',
+  'reaction-results-rows',
+  'summary-results',
+]) {
+  assert.match(
+    indexHtml,
+    new RegExp(`id=["']${targetId}["']`),
+    `${targetId} should exist in index.html`
+  );
+}
+assert.match(
+  indexHtml,
+  /id=["']analysis-panel["'][^>]*class=["'][^"']*analysis-panel--hidden[^"']*["']/,
+  'analysis panel should be hidden in the static HTML before JavaScript initializes'
+);
 
 const browserRuntime = loadAppWithFakeDom();
 assert.equal(browserRuntime.fakeDocument.body.dataset.webModelEditorReady, 'true');
 assert.deepEqual(browserRuntime.fakeWindow.webModelEditor.state.model, createEmptyModel());
+assert.equal(browserRuntime.fakeWindow.webModelEditor.state.analysis, null);
 assert.equal(browserRuntime.fakeWindow.webModelEditor.dom.nodes.id, 'nodes');
 assert.equal(browserRuntime.elements.get('nodes-count').textContent, '0/10');
 assert.equal(browserRuntime.elements.get('elements-count').textContent, '0/20');
@@ -888,6 +916,8 @@ assert.equal(
   buildCommand('custom.model')
 );
 assert.equal(browserRuntime.elements.get('export-model-button').disabled, true);
+assert.equal(browserRuntime.elements.get('analyze-model-button').disabled, true);
+assert.match(browserRuntime.elements.get('analysis-panel').className, /analysis-panel--hidden/);
 assert.doesNotMatch(browserRuntime.elements.get('error-message').className, /status--error/);
 assert.equal(browserRuntime.elements.get('error-message').textContent, '');
 for (const rowsId of ['nodes-rows', 'elements-rows', 'loads-rows', 'constraints-rows']) {
@@ -928,12 +958,36 @@ async function runBrowserWorkflowAssertions() {
     assert.equal(elements.get('loads-count').textContent, '1/10');
     assert.equal(elements.get('constraints-count').textContent, '3/10');
     assert.match(elements.get('status-message').textContent, /模型已可导出/);
+    assert.equal(elements.get('analyze-model-button').disabled, false);
+
+    await dispatchEvent(elements.get('analyze-model-button'), 'click');
+    assert.equal(fakeWindow.webModelEditor.state.analysis.ok, true);
+    assert.match(elements.get('analysis-panel').className, /^analysis-panel$/);
+    assert.match(elements.get('analysis-status').textContent, /完成/);
+    for (const targetId of [
+      'node-results-rows',
+      'element-results-rows',
+      'reaction-results-rows',
+      'summary-results',
+    ]) {
+      assert.equal(
+        elements.get(targetId).textContent.length > 0 || elements.get(targetId).innerHTML.length > 0,
+        true,
+        `${targetId} should contain analysis results`
+      );
+    }
 
     const duplicateNodeIdInput = {
       dataset: { action: 'edit-field', index: '2', field: 'id' },
       value: '2',
     };
     await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
+    assert.equal(fakeWindow.webModelEditor.state.analysis, null);
+    assert.match(elements.get('analysis-panel').className, /analysis-panel--hidden/);
+    assert.equal(elements.get('node-results-rows').innerHTML, '');
+    assert.equal(elements.get('element-results-rows').innerHTML, '');
+    assert.equal(elements.get('reaction-results-rows').innerHTML, '');
+    assert.equal(elements.get('summary-results').innerHTML, '');
     assert.equal(elements.get('export-model-button').disabled, true);
     assert.match(elements.get('status-message').textContent, /模型暂不能导出/);
     assert.match(elements.get('serialized-preview').textContent, /^# 当前模型无效/);
@@ -943,7 +997,20 @@ async function runBrowserWorkflowAssertions() {
     duplicateNodeIdInput.value = '3';
     await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
     assert.equal(elements.get('export-model-button').disabled, false);
+    assert.equal(elements.get('analyze-model-button').disabled, false);
     assert.equal(elements.get('error-message').textContent, '');
+
+    await dispatchEvent(elements.get('analyze-model-button'), 'click');
+    assert.equal(fakeWindow.webModelEditor.state.analysis.ok, true);
+    duplicateNodeIdInput.value = '2';
+    await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
+    await dispatchEvent(elements.get('analyze-model-button'), 'click');
+    assert.equal(fakeWindow.webModelEditor.state.analysis, null);
+    assert.match(elements.get('analysis-panel').className, /analysis-panel--hidden/);
+    assert.equal(elements.get('node-results-rows').innerHTML, '');
+    assert.match(elements.get('error-message').textContent, /NODES.*ID/i);
+    duplicateNodeIdInput.value = '3';
+    await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
     assert.doesNotMatch(
       getRenderedControl(elements.get('nodes-rows'), 2, 'id').parentNode.className,
       /invalid/i
