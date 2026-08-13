@@ -24,23 +24,68 @@
 
 Stage 10 仍然是回归测试的一部分，但日常使用不再需要单独编排测试程序：统一入口 `fem` 已直接覆盖“读取输入 → 求解 → 选定输出”的完整流程。
 
+## 快速开始
+
+### Windows PowerShell（MSYS2 UCRT64）
+
+在仓库根目录执行以下命令即可完成编译并运行中型示例。输出目录需要提前存在，程序不会自动创建目录。
+
+```powershell
+$gcc = "C:\msys64\ucrt64\bin\gcc.exe"
+& $gcc -std=c11 -Wall -Wextra -pedantic `
+    src\main.c src\cli.c src\pipeline.c src\fem.c src\solver.c `
+    src\reactions.c src\postprocess.c src\io.c src\output.c `
+    -Iinclude -o fem.exe -lm
+
+New-Item -ItemType Directory -Force results | Out-Null
+& .\fem.exe --input .\tests\data\medium.model `
+    --output-dir .\results --prefix medium
+```
+
+运行成功后，`results` 目录中会生成：
+
+```text
+medium.txt
+medium.md
+medium.csv
+```
+
+### Linux / macOS / MSYS2 Shell
+
+```bash
+gcc -std=c11 -Wall -Wextra -pedantic \
+  src/main.c src/cli.c src/pipeline.c src/fem.c src/solver.c \
+  src/reactions.c src/postprocess.c src/io.c src/output.c \
+  -Iinclude -o fem -lm
+
+mkdir -p results
+./fem --input tests/data/medium.model --output-dir results --prefix medium
+```
+
 ## 无 Docker 的本地命令行工作流
 
 在仓库根目录编译统一入口：
 
-```text
+```bash
 gcc -std=c11 -Wall -Wextra -pedantic src/main.c src/cli.c src/pipeline.c src/fem.c src/solver.c src/reactions.c src/postprocess.c src/io.c src/output.c -Iinclude -o fem -lm
 ```
 
 编译后可直接运行以下命令。
 
-默认统一命令（输出全部格式、全部区段）：
+默认统一命令（输出全部格式、全部区段；Windows 下将 `./fem` 替换为 `./fem.exe`）：
 
-```text
-./fem --input tests/data/medium.model
+```bash
+mkdir -p results
+./fem --input tests/data/medium.model --output-dir results --prefix medium
 ```
 
-默认会在当前目录生成：
+该命令会生成：
+
+- `results/medium.txt`
+- `results/medium.md`
+- `results/medium.csv`
+
+如果不指定 `--output-dir` 和 `--prefix`，默认文件名仍为：
 
 - `fem_results.txt`
 - `fem_results.md`
@@ -48,8 +93,8 @@ gcc -std=c11 -Wall -Wextra -pedantic src/main.c src/cli.c src/pipeline.c src/fem
 
 自定义输出命令（只写 TXT 和 Markdown，且只包含节点 / 反力 / 汇总区段）：
 
-```text
-./fem --input tests/data/medium.model --output-dir . --prefix unified_medium --format txt,markdown --include nodes,reactions,summary
+```bash
+./fem --input tests/data/medium.model --output-dir results --prefix unified_medium --format txt,markdown --include nodes,reactions,summary
 ```
 
 该命令只会生成：
@@ -61,13 +106,13 @@ gcc -std=c11 -Wall -Wextra -pedantic src/main.c src/cli.c src/pipeline.c src/fem
 
 保留 Stage 1 演示模式：
 
-```text
+```bash
 ./fem --demo
 ```
 
 帮助信息：
 
-```text
+```bash
 ./fem --help
 ```
 
