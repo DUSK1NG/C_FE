@@ -73,3 +73,37 @@ git diff --check
 ## Concerns
 
 无已知功能问题。验证覆盖 Node 渲染与假 DOM 工作流；未启动真实浏览器进行人工视觉检查。
+
+## 审查修复：偏移坐标变形图
+
+审查发现原始变形图先按坐标绝对值归一化，并对跨度使用固定 `0.01` 下限。对于坐标整体偏移很大、但实际跨度较小的模型，这会将几何压缩到极小区域，且原点图例不在 `viewBox` 内。
+
+修复内容：
+
+- 以节点原始坐标的 `minX` / `minY` 平移所有图形坐标到局部原点，再由真实的 `maxX - minX` / `maxY - minY` 计算跨度和 `viewBox`。
+- 移除固定 `0.01` 跨度下限；不可用的非正或非有限跨度返回安全空状态。
+- 图例的位置和尺寸按计算后的跨度派生，确保其位于带 padding 的 `viewBox` 内。
+- 增加 `1_000_000` 坐标偏移、实际 `100` 跨度模型的回归测试，断言有限 `viewBox`、局部有效几何、图例和无 `NaN` / `Infinity`。
+
+TDD 红灯命令：
+
+```text
+C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe tests\test_web_model.js
+```
+
+实际失败输出：
+
+```text
+AssertionError: The input did not match /viewBox="-14 -14 128 128"/
+... viewBox="0.9985 0.9985 0.0128 0.0128" ...
+```
+
+最终验证命令和输出：
+
+```text
+node --check web\app.js                 # 退出码 0，无输出
+node tests\test_web_model.js            # web model tests passed
+git diff --check                         # 退出码 0，无差异错误
+```
+
+修复实现提交：`920e5c7149c9e803470b6e3ae84b037418e32033` (`fix: preserve deformation chart bounds for offset models`)。
