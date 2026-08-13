@@ -873,27 +873,26 @@ function renderDeformationSvg(model, results) {
     return renderEmptySvg('analysis-svg deformation-svg', '暂无可显示的变形结果');
   }
 
-  const coordinateScale = Math.max(
-    1,
-    ...nodes.flatMap((node) => [Math.abs(node.x), Math.abs(node.y)])
-  );
+  const minX = Math.min(...nodes.map((node) => node.x));
+  const maxX = Math.max(...nodes.map((node) => node.x));
+  const minY = Math.min(...nodes.map((node) => node.y));
+  const maxY = Math.max(...nodes.map((node) => node.y));
+  const span = Math.max(maxX - minX, maxY - minY);
+  if (!Number.isFinite(span) || span <= 0) {
+    return renderEmptySvg('analysis-svg deformation-svg', '暂无可显示的变形结果');
+  }
   const normalizedNodes = nodes.map((node) => ({
     ...node,
-    x: node.x / coordinateScale,
-    y: node.y / coordinateScale,
+    x: node.x - minX,
+    y: node.y - minY,
   }));
-  const minX = Math.min(...normalizedNodes.map((node) => node.x));
-  const maxX = Math.max(...normalizedNodes.map((node) => node.x));
-  const minY = Math.min(...normalizedNodes.map((node) => node.y));
-  const maxY = Math.max(...normalizedNodes.map((node) => node.y));
-  const span = Math.max(maxX - minX, maxY - minY, 0.01);
   const padding = span * 0.14;
   const displacementByNode = new Map(
     displacements.map((result) => [
       result?.node,
       {
-        ux: Number.isFinite(result?.ux) ? result.ux / coordinateScale : 0,
-        uy: Number.isFinite(result?.uy) ? result.uy / coordinateScale : 0,
+        ux: Number.isFinite(result?.ux) ? result.ux : 0,
+        uy: Number.isFinite(result?.uy) ? result.uy : 0,
       },
     ])
   );
@@ -941,14 +940,24 @@ function renderDeformationSvg(model, results) {
       );
     })
     .join('');
+  const legendX = span * 0.04;
+  const legendY = span * 0.08;
+  const legendLength = span * 0.12;
+  const legendLabelOffset = span * 0.02;
+  const legendLineGap = span * 0.08;
+  const legend =
+    `<g class="svg-legend"><line class="deformation-original" x1="${formatSvgNumber(legendX)}" ` +
+    `y1="${formatSvgNumber(legendY)}" x2="${formatSvgNumber(legendX + legendLength)}" y2="${formatSvgNumber(legendY)}" />` +
+    `<text x="${formatSvgNumber(legendX + legendLength + legendLabelOffset)}" y="${formatSvgNumber(legendY + legendLabelOffset)}">原始形状</text>` +
+    `<line class="deformation-deformed" x1="${formatSvgNumber(legendX)}" y1="${formatSvgNumber(legendY + legendLineGap)}" ` +
+    `x2="${formatSvgNumber(legendX + legendLength)}" y2="${formatSvgNumber(legendY + legendLineGap)}" />` +
+    `<text x="${formatSvgNumber(legendX + legendLength + legendLabelOffset)}" y="${formatSvgNumber(legendY + legendLineGap + legendLabelOffset)}">变形后形状</text></g>`;
 
   return (
-    `<svg class="analysis-svg deformation-svg" viewBox="${formatSvgNumber(minX - padding)} ${formatSvgNumber(minY - padding)} ` +
+    `<svg class="analysis-svg deformation-svg" viewBox="${formatSvgNumber(-padding)} ${formatSvgNumber(-padding)} ` +
     `${formatSvgNumber(span + padding * 2)} ${formatSvgNumber(span + padding * 2)}" role="img" aria-label="节点与杆件变形图" ` +
     'xmlns="http://www.w3.org/2000/svg">' +
-    '<g class="svg-legend"><line class="deformation-original" x1="0" y1="0" x2="0.12" y2="0" />' +
-    '<text x="0.14" y="0.02">原始形状</text><line class="deformation-deformed" x1="0" y1="0.06" x2="0.12" y2="0.06" />' +
-    '<text x="0.14" y="0.08">变形后形状</text></g>' +
+    legend +
     renderedElements +
     renderedNodes +
     '</svg>'

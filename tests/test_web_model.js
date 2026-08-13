@@ -487,6 +487,35 @@ const zeroDisplacementSvg = renderDeformationSvg(
 assert.match(zeroDisplacementSvg, /data-node/);
 assert.doesNotMatch(zeroDisplacementSvg, /(?:NaN|Infinity)/);
 
+const offsetModel = {
+  nodes: [
+    { id: 1, x: 1000000, y: 1000000 },
+    { id: 2, x: 1000100, y: 1000000 },
+    { id: 3, x: 1000000, y: 1000050 },
+  ],
+  elements: [
+    { id: 1, node1: 1, node2: 2, E: 210000, A: 100 },
+    { id: 2, node1: 1, node2: 3, E: 210000, A: 100 },
+  ],
+};
+const offsetDeformationSvg = renderDeformationSvg(offsetModel, {
+  nodeDisplacements: offsetModel.nodes.map((node) => ({
+    node: node.id,
+    ux: 0,
+    uy: 0,
+    magnitude: 0,
+  })),
+});
+assert.match(offsetDeformationSvg, /viewBox="-14 -14 128 128"/);
+assert.match(offsetDeformationSvg, /<line class="deformation-original" x1="0" y1="0" x2="100" y2="0"/);
+assert.match(
+  offsetDeformationSvg,
+  /<g class="svg-legend"><line class="deformation-original" x1="4" y1="8" x2="16" y2="8"/
+);
+assert.match(offsetDeformationSvg, /原始形状/);
+assert.match(offsetDeformationSvg, /变形后形状/);
+assert.doesNotMatch(offsetDeformationSvg, /(?:NaN|Infinity)/);
+
 const emptyAxialForceSvg = renderAxialForceSvg({ elementResults: [] });
 assert.match(emptyAxialForceSvg, /svg-empty-state/);
 assert.doesNotMatch(emptyAxialForceSvg, /(?:NaN|Infinity)/);
