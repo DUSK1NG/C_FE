@@ -677,14 +677,17 @@ async function runBrowserWorkflowAssertions() {
 
     const nodesBeforeEdit = elements.get('nodes-rows').innerHTML;
     const elementsBeforeEdit = elements.get('elements-rows').innerHTML;
-    await dispatchEvent(elements.get('nodes'), 'input', {
-      target: {
-        dataset: { action: 'edit-field', index: '2', field: 'x' },
-        value: '650',
-      },
-    });
+    const nodeXInput = {
+      dataset: { action: 'edit-field', index: '2', field: 'x' },
+      value: '',
+    };
+    for (const value of ['6', '65', '650']) {
+      nodeXInput.value = value;
+      await dispatchEvent(elements.get('nodes'), 'input', { target: nodeXInput });
+    }
     assert.equal(fakeWindow.webModelEditor.state.model.nodes[2].x, 650);
-    assert.notEqual(elements.get('nodes-rows').innerHTML, nodesBeforeEdit);
+    assert.equal(nodeXInput.value, '650');
+    assert.equal(elements.get('nodes-rows').innerHTML, nodesBeforeEdit);
     assert.equal(elements.get('elements-rows').innerHTML, elementsBeforeEdit);
     assert.match(elements.get('serialized-preview').textContent, /3 650 800/);
 

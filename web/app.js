@@ -718,7 +718,6 @@ function updateSingleField(section, event, state, dom) {
     [fieldName]: parseBrowserValue(target.value, field.valueType),
   };
   state.lastError = '';
-  renderSectionRows(section, state.model, dom);
   updateStatusPanels(dom, state);
 }
 

@@ -77,3 +77,31 @@ Red evidence note:
 
 - No fresh red failure was generated during this takeover because the inherited Task 4 implementation was already present and the user asked not to extend complete code.
 - Real browser verification is not included because the local `file:///` page was blocked by browser URL policy and the user then instructed me to stop browser attempts.
+
+## Round 1 narrow fix
+
+Root cause: `updateSingleField` called `renderSectionRows` for every `input` event, replacing the active input node as its value changed.
+
+TDD red verification:
+
+```text
+> C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe tests\test_web_model.js
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal
+...
+actual:   nodes-rows HTML with value="650"
+expected: nodes-rows HTML with value="500"
+Exit code: 1
+```
+
+Fix: input now updates model state and status/preview only. Section rows still redraw for add and delete actions.
+
+Post-fix verification:
+
+```text
+> C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe --check web/app.js
+Exit code: 0
+
+> C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe tests\test_web_model.js
+web model tests passed
+Exit code: 0
+```
