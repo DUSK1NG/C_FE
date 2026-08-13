@@ -29,21 +29,39 @@ open web/index.html
 4. 在“导出文件名”中输入名称，点击“导出 .model”。浏览器会把规范化后的文本文件下载到浏览器配置的下载位置。
 5. 将导出的文件放到仓库根目录，或在命令中使用它的实际路径，然后在终端运行页面显示的 `fem --input ...` 命令。
 
-Windows PowerShell 使用已编译的 `fem.exe` 时，将命令开头改成 `.\fem.exe`：
+页面显示的命令契约只包含输入文件，例如 `fem --input 'custom.model'`。Windows PowerShell 使用已编译的 `fem.exe` 时，将命令开头改成 `.\fem.exe`：
+
+```powershell
+& .\fem.exe --input .\custom.model
+```
+
+Linux/macOS 使用已编译的 `fem`：
+
+```bash
+./fem --input ./custom.model
+```
+
+默认会在当前目录生成：
+
+- `fem_results.txt`
+- `fem_results.md`
+- `fem_results.csv`
+
+如果希望写入 `results/custom.*` 等自定义位置，请在终端里显式追加输出选项；输出目录必须事先存在。
+
+Windows PowerShell：
 
 ```powershell
 New-Item -ItemType Directory -Force results | Out-Null
 & .\fem.exe --input .\custom.model --output-dir .\results --prefix custom
 ```
 
-Linux/macOS 使用已编译的 `fem`：
+Linux/macOS：
 
 ```bash
 mkdir -p results
 ./fem --input ./custom.model --output-dir ./results --prefix custom
 ```
-
-默认会生成 `results/custom.txt`、`results/custom.md` 和 `results/custom.csv`。输出目录必须事先存在。
 
 ## 字段与格式
 

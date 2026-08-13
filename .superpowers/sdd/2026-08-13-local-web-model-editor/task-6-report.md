@@ -127,7 +127,7 @@ PASS cli: CLI parser tests passed.
 
 C regression count: **13 targets compiled, 13 targets passed, 0 failures**. The Stage 9 Windows-only full-device branch emitted its existing documented skip; the Stage 9 test target passed.
 
-## Unified `fem` CLI smoke
+## Page-command default CLI smoke
 
 The CLI was compiled with the README command's strict flags and complete source list:
 
@@ -135,22 +135,23 @@ The CLI was compiled with the README command's strict flags and complete source 
 gcc -std=c11 -Wall -Wextra -pedantic src/main.c src/cli.c src/pipeline.c src/fem.c src/solver.c src/reactions.c src/postprocess.c src/io.c src/output.c -Iinclude -o TEMP/fem-task6.exe -lm
 ```
 
-From the repository root, the temporary executable ran once for each temporary web export using:
+An exported `custom.model` and the compiled `fem.exe` were placed together in a temporary independent directory. From that directory, the exact page-generated command contract was executed as:
 
 ```text
-TEMP/fem-task6.exe --input TEMP/<name>-exported.model --output-dir TEMP/<name>-results --prefix <name>
+& .\fem.exe --input .\custom.model
 ```
 
-For each model, the check required non-empty `.txt`, `.md`, and `.csv` files. It also checked all four TXT/Markdown headings and the `NODE`, `ELEMENT`, `REACTION`, and `SUMMARY` CSV record markers.
+This contract only supplies the input path. The smoke check then verified that the default-output behavior created non-empty `fem_results.txt`, `fem_results.md`, and `fem_results.csv` in that same working directory.
 
 Output:
 
 ```text
-PASS fem triangle: TXT/Markdown/CSV generated; bytes=586/897/690
-PASS fem medium: TXT/Markdown/CSV generated; bytes=1118/1559/1351
+PASS page command default output: fem_results.txt/md/csv generated in isolated temp directory; bytes=586/897/690
 ```
 
-The temporary directory was resolved under the requested worktree, removed recursively after verification, and confirmed absent. No generated executable, exported model, or result file remains in the working tree.
+For custom destinations such as `results/custom.*`, the contract requires a separate explicit terminal command with `--output-dir` and `--prefix`; those options are not part of the page-generated command.
+
+The temporary directory was resolved as an independent system temp directory outside the repository, removed recursively after verification, and confirmed absent. No generated executable, exported model, or result file remains in the working tree.
 
 ## Final file list
 

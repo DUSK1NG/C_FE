@@ -46,7 +46,7 @@ macOS：
 open web/index.html
 ```
 
-也可以在文件管理器中双击 `web/index.html`。页面打开后，可加载内置示例或点击“导入 .model”，编辑四个模型分区；校验通过后，填写文件名并点击“导出 .model”。将下载的文件放到仓库根目录，然后按页面显示的命令运行 `fem`。Windows PowerShell 中需将命令开头的 `fem` 改为 `.\fem.exe`；Linux/macOS 中如果当前目录不在 `PATH`，改为 `./fem`。
+也可以在文件管理器中双击 `web/index.html`。页面打开后，可加载内置示例或点击“导入 .model”，编辑四个模型分区；校验通过后，填写文件名并点击“导出 .model”。将下载的文件放到仓库根目录，然后按页面显示的 `fem --input ...` 命令运行。页面中的命令只负责把导出的 `.model` 文件作为输入传给求解器；如果不额外追加输出选项，求解器会在当前目录生成默认的 `fem_results.txt`、`fem_results.md` 和 `fem_results.csv`。如需写入 `results/custom.*` 等自定义位置，请在终端中另行追加 `--output-dir` 与 `--prefix`。Windows PowerShell 中需将命令开头的 `fem` 改为 `.\fem.exe`；Linux/macOS 中如果当前目录不在 `PATH`，改为 `./fem`。
 
 网页只负责在浏览器内编辑、校验、预览和下载模型。当前版本是无服务器的静态页面，**不会也不能从浏览器直接执行 `fem` 或 `fem.exe`**；求解仍需在仓库根目录的终端中运行。字段、容量、导入/导出规则和完整使用流程见 [`web/README.md`](web/README.md)。
 
