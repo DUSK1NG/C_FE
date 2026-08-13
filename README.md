@@ -24,6 +24,32 @@
 
 Stage 10 仍然是回归测试的一部分，但日常使用不再需要单独编排测试程序：统一入口 `fem` 已直接覆盖“读取输入 → 求解 → 选定输出”的完整流程。
 
+## 本地网页模型配置器
+
+无需安装网页依赖或启动服务器，直接打开 [`web/index.html`](web/index.html) 即可编辑 `.model` 文件。
+
+Windows PowerShell：
+
+```powershell
+Start-Process .\web\index.html
+```
+
+Linux：
+
+```bash
+xdg-open web/index.html
+```
+
+macOS：
+
+```bash
+open web/index.html
+```
+
+也可以在文件管理器中双击 `web/index.html`。页面打开后，可加载内置示例或点击“导入 .model”，编辑四个模型分区；校验通过后，填写文件名并点击“导出 .model”。将下载的文件放到仓库根目录，然后按页面显示的命令运行 `fem`。Windows PowerShell 中需将命令开头的 `fem` 改为 `.\fem.exe`；Linux/macOS 中如果当前目录不在 `PATH`，改为 `./fem`。
+
+网页只负责在浏览器内编辑、校验、预览和下载模型。当前版本是无服务器的静态页面，**不会也不能从浏览器直接执行 `fem` 或 `fem.exe`**；求解仍需在仓库根目录的终端中运行。字段、容量、导入/导出规则和完整使用流程见 [`web/README.md`](web/README.md)。
+
 ## 快速开始
 
 ### Windows PowerShell（MSYS2 UCRT64）

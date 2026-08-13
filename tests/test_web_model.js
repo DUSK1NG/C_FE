@@ -820,6 +820,11 @@ const indexHtml = fs.readFileSync(indexPath, 'utf8');
 assert.match(indexHtml, /<link[^>]+href=["']\.\/styles\.css["']/);
 assert.match(indexHtml, /<script[^>]+src=["']\.\/app\.js["']/);
 assert.match(indexHtml, /id=["']file-name-input["']/);
+assert.match(
+  indexHtml,
+  /id=["']error-message["'][^>]*class=["'][^"']*status--hidden[^"']*["']/,
+  'error panel should be hidden in the static HTML before JavaScript initializes'
+);
 for (const sectionId of ['nodes', 'elements', 'loads', 'constraints']) {
   assert.match(
     indexHtml,
@@ -841,6 +846,7 @@ assert.equal(
   true,
   'status message should be initialized'
 );
+assert.match(browserRuntime.elements.get('status-message').textContent, /[\u4e00-\u9fff]/);
 assert.equal(
   browserRuntime.elements.get('command-preview').textContent,
   buildCommand('custom.model')
@@ -885,6 +891,7 @@ async function runBrowserWorkflowAssertions() {
     assert.equal(elements.get('elements-count').textContent, '3/20');
     assert.equal(elements.get('loads-count').textContent, '1/10');
     assert.equal(elements.get('constraints-count').textContent, '3/10');
+    assert.match(elements.get('status-message').textContent, /模型已可导出/);
 
     const duplicateNodeIdInput = {
       dataset: { action: 'edit-field', index: '2', field: 'id' },
@@ -892,6 +899,8 @@ async function runBrowserWorkflowAssertions() {
     };
     await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
     assert.equal(elements.get('export-model-button').disabled, true);
+    assert.match(elements.get('status-message').textContent, /模型暂不能导出/);
+    assert.match(elements.get('serialized-preview').textContent, /^# 当前模型无效/);
     assert.match(elements.get('error-message').textContent, /NODES.*ID/i);
     assert.match(getRenderedControl(elements.get('nodes-rows'), 2, 'id').parentNode.className, /invalid/i);
 

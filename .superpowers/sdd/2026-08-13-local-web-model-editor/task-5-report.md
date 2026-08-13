@@ -76,7 +76,7 @@ web model tests passed
 
 ### Concerns
 
-- Existing page copy in the checked-in HTML/JS still contains earlier mojibake text outside the Task 5 scope. The new validation/count/limit behavior works and is covered by tests, but broader text cleanup was intentionally left untouched.
+- None. A later UTF-8-aware review confirmed that the checked-in HTML/JavaScript copy is valid Chinese; the earlier mojibake concern was caused by reading UTF-8 files with the wrong console encoding, not by the repository contents.
 
 ## Fix round 1
 

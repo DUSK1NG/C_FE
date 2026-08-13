@@ -793,11 +793,10 @@ function updateStatusPanels(dom, state) {
     if (dom.statusMessage) {
       dom.statusMessage.className = 'status status--ok';
       dom.statusMessage.textContent =
-        `Model is ready to export. ` +
-        `${state.model.nodes.length} node(s), ` +
-        `${state.model.elements.length} element(s), ` +
-        `${state.model.loads.length} load(s), ` +
-        `${state.model.constraints.length} constraint record(s).`;
+        `模型已可导出：${state.model.nodes.length} 个节点、` +
+        `${state.model.elements.length} 个单元、` +
+        `${state.model.loads.length} 条荷载、` +
+        `${state.model.constraints.length} 条约束。`;
     }
     if (dom.errorMessage) {
       if (state.lastError) {
@@ -821,8 +820,8 @@ function updateStatusPanels(dom, state) {
     dom.statusMessage.className = blankModel && !state.lastError ? 'status status--muted' : 'status status--error';
     dom.statusMessage.textContent =
       blankModel && !state.lastError
-        ? 'Add nodes and elements to enable export.'
-        : `Model cannot be exported yet. ${validation.errors.length} issue(s) need attention.`;
+        ? '请先添加节点和单元，校验通过后即可导出。'
+        : `模型暂不能导出：有 ${validation.errors.length} 个问题需要处理。`;
   }
   if (dom.errorMessage) {
     if (blankModel && !state.lastError) {
@@ -835,7 +834,7 @@ function updateStatusPanels(dom, state) {
   }
   if (dom.serializedPreview) {
     dom.serializedPreview.textContent =
-      '# Current model is invalid and cannot be exported.\n' + validation.errors.join('\n');
+      '# 当前模型无效，不能导出。\n' + validation.errors.join('\n');
   }
   if (dom.exportModelButton) {
     dom.exportModelButton.disabled = true;
