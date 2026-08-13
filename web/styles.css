@@ -258,6 +258,13 @@ button:disabled {
   gap: 1rem;
 }
 
+.analysis-visualizations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
 .results-card {
   min-width: 0;
   padding: 1.15rem;
@@ -266,6 +273,82 @@ button:disabled {
 .results-card h3 {
   margin-bottom: 0.85rem;
   font-size: 1rem;
+}
+
+.svg-card {
+  min-width: 0;
+}
+
+.svg-host {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.analysis-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 12rem;
+  border: 1px solid #e3e9f4;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.deformation-original {
+  stroke: #94a3b8;
+  stroke-width: 0.012;
+  stroke-dasharray: 0.025 0.018;
+  vector-effect: non-scaling-stroke;
+}
+
+.deformation-deformed {
+  stroke: #2563eb;
+  stroke-width: 0.018;
+  vector-effect: non-scaling-stroke;
+}
+
+.deformation-node {
+  fill: #1d4ed8;
+  stroke: #ffffff;
+  stroke-width: 0.008;
+  vector-effect: non-scaling-stroke;
+}
+
+.svg-legend text,
+.axial-force-label {
+  fill: var(--text-muted);
+  font-size: 0.055px;
+}
+
+.svg-legend--axial text,
+.axial-force-label {
+  font-size: 13px;
+}
+
+.axial-force-baseline {
+  stroke: #64748b;
+  stroke-width: 2;
+}
+
+.axial-force-bar {
+  rx: 3;
+}
+
+.bar--tension {
+  fill: #dc2626;
+}
+
+.bar--compression {
+  fill: #2563eb;
+}
+
+.bar--zero {
+  fill: #94a3b8;
+}
+
+.svg-empty-state {
+  fill: var(--text-muted);
+  font-size: 18px;
 }
 
 .results-card table {
@@ -368,7 +451,8 @@ select {
 @media (max-width: 980px) {
   .status-grid,
   .editor-grid,
-  .results-grid {
+  .results-grid,
+  .analysis-visualizations {
     grid-template-columns: 1fr;
   }
 }

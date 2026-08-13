@@ -7,6 +7,8 @@ const {
   createEmptyModel,
   analyzeModel,
   parseModel,
+  renderAxialForceSvg,
+  renderDeformationSvg,
   validateModel,
   serializeModel,
 } = require('../web/app.js');
@@ -329,6 +331,8 @@ function loadAppWithFakeDom() {
     'element-results-rows',
     'reaction-results-rows',
     'summary-results',
+    'deformation-svg',
+    'axial-force-svg',
     'nodes-count',
     'elements-count',
     'loads-count',
@@ -450,6 +454,56 @@ const analyzedTriangle = analyzeModel(triangleParsed.model);
 assert.equal(analyzedTriangle.ok, true, analyzedTriangle.error);
 assert.equal(analyzedTriangle.results.nodeDisplacements.length, 3);
 assert.equal(analyzedTriangle.results.elementResults.length, 3);
+
+const deformationSvg = renderDeformationSvg(triangleParsed.model, analyzedTriangle.results);
+assert.match(deformationSvg, /<svg/);
+assert.match(deformationSvg, /data-node/);
+assert.doesNotMatch(deformationSvg, /(?:NaN|Infinity)/);
+
+const axialForceSvg = renderAxialForceSvg(analyzedTriangle.results);
+assert.match(axialForceSvg, /<svg/);
+assert.match(axialForceSvg, /data-element/);
+assert.doesNotMatch(axialForceSvg, /(?:NaN|Infinity)/);
+
+const emptyDeformationSvg = renderDeformationSvg(
+  { nodes: [], elements: [] },
+  { nodeDisplacements: [], elementResults: [] }
+);
+assert.match(emptyDeformationSvg, /svg-empty-state/);
+assert.doesNotMatch(emptyDeformationSvg, /(?:NaN|Infinity)/);
+
+const zeroDisplacementSvg = renderDeformationSvg(
+  triangleParsed.model,
+  {
+    ...analyzedTriangle.results,
+    nodeDisplacements: triangleParsed.model.nodes.map((node) => ({
+      node: node.id,
+      ux: 0,
+      uy: 0,
+      magnitude: 0,
+    })),
+  }
+);
+assert.match(zeroDisplacementSvg, /data-node/);
+assert.doesNotMatch(zeroDisplacementSvg, /(?:NaN|Infinity)/);
+
+const emptyAxialForceSvg = renderAxialForceSvg({ elementResults: [] });
+assert.match(emptyAxialForceSvg, /svg-empty-state/);
+assert.doesNotMatch(emptyAxialForceSvg, /(?:NaN|Infinity)/);
+
+const escapedSvg = renderAxialForceSvg({
+  elementResults: [
+    { element: '1\"><script>alert(1)</script>', axialForce: Number.NaN, status: 'tension' },
+  ],
+});
+assert.doesNotMatch(escapedSvg, /<script/);
+assert.match(escapedSvg, /&lt;script&gt;/);
+assert.doesNotMatch(escapedSvg, /(?:NaN|Infinity)/);
+
+const extremeForceSvg = renderAxialForceSvg({
+  elementResults: [{ element: 1, axialForce: Number.MAX_VALUE, status: 'tension' }],
+});
+assert.doesNotMatch(extremeForceSvg, /(?:NaN|Infinity)/);
 
 const zeroLengthAnalysis = analyzeModel({
   ...makeValidModel(),
@@ -883,6 +937,8 @@ for (const targetId of [
   'element-results-rows',
   'reaction-results-rows',
   'summary-results',
+  'deformation-svg',
+  'axial-force-svg',
 ]) {
   assert.match(
     indexHtml,
@@ -969,6 +1025,8 @@ async function runBrowserWorkflowAssertions() {
       'element-results-rows',
       'reaction-results-rows',
       'summary-results',
+      'deformation-svg',
+      'axial-force-svg',
     ]) {
       assert.equal(
         elements.get(targetId).textContent.length > 0 || elements.get(targetId).innerHTML.length > 0,
@@ -988,6 +1046,8 @@ async function runBrowserWorkflowAssertions() {
     assert.equal(elements.get('element-results-rows').innerHTML, '');
     assert.equal(elements.get('reaction-results-rows').innerHTML, '');
     assert.equal(elements.get('summary-results').innerHTML, '');
+    assert.equal(elements.get('deformation-svg').innerHTML, '');
+    assert.equal(elements.get('axial-force-svg').innerHTML, '');
     assert.equal(elements.get('export-model-button').disabled, true);
     assert.match(elements.get('status-message').textContent, /模型暂不能导出/);
     assert.match(elements.get('serialized-preview').textContent, /^# 当前模型无效/);

@@ -812,6 +812,8 @@ function getBrowserDom(doc) {
     elementResultsRows: doc.getElementById('element-results-rows'),
     reactionResultsRows: doc.getElementById('reaction-results-rows'),
     summaryResults: doc.getElementById('summary-results'),
+    deformationSvg: doc.getElementById('deformation-svg'),
+    axialForceSvg: doc.getElementById('axial-force-svg'),
   };
 
   for (const section of BROWSER_SECTION_CONFIG) {
@@ -841,6 +843,167 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function formatSvgNumber(value) {
+  if (!Number.isFinite(value)) {
+    return '0';
+  }
+  const rounded = Math.round(value * 1000000) / 1000000;
+  return Number.isFinite(rounded) ? String(rounded) : String(value);
+}
+
+function renderEmptySvg(chartClass, message) {
+  return (
+    `<svg class="${chartClass}" viewBox="0 0 800 180" role="img" aria-label="${escapeHtml(message)}" ` +
+    'xmlns="http://www.w3.org/2000/svg">' +
+    `<text class="svg-empty-state" x="400" y="90" text-anchor="middle">${escapeHtml(message)}</text>` +
+    '</svg>'
+  );
+}
+
+function renderDeformationSvg(model, results) {
+  const nodes = Array.isArray(model?.nodes)
+    ? model.nodes.filter((node) => Number.isFinite(node?.x) && Number.isFinite(node?.y))
+    : [];
+  const elements = Array.isArray(model?.elements) ? model.elements : [];
+  const displacements = Array.isArray(results?.nodeDisplacements) ? results.nodeDisplacements : [];
+
+  if (nodes.length === 0 || elements.length === 0 || displacements.length === 0) {
+    return renderEmptySvg('analysis-svg deformation-svg', '暂无可显示的变形结果');
+  }
+
+  const coordinateScale = Math.max(
+    1,
+    ...nodes.flatMap((node) => [Math.abs(node.x), Math.abs(node.y)])
+  );
+  const normalizedNodes = nodes.map((node) => ({
+    ...node,
+    x: node.x / coordinateScale,
+    y: node.y / coordinateScale,
+  }));
+  const minX = Math.min(...normalizedNodes.map((node) => node.x));
+  const maxX = Math.max(...normalizedNodes.map((node) => node.x));
+  const minY = Math.min(...normalizedNodes.map((node) => node.y));
+  const maxY = Math.max(...normalizedNodes.map((node) => node.y));
+  const span = Math.max(maxX - minX, maxY - minY, 0.01);
+  const padding = span * 0.14;
+  const displacementByNode = new Map(
+    displacements.map((result) => [
+      result?.node,
+      {
+        ux: Number.isFinite(result?.ux) ? result.ux / coordinateScale : 0,
+        uy: Number.isFinite(result?.uy) ? result.uy / coordinateScale : 0,
+      },
+    ])
+  );
+  const maximumDisplacement = Math.max(
+    0,
+    ...[...displacementByNode.values()].map(({ ux, uy }) =>
+      Number.isFinite(ux) && Number.isFinite(uy) ? Math.hypot(ux, uy) : 0
+    )
+  );
+  const deformationScale = maximumDisplacement > 0 && Number.isFinite(maximumDisplacement)
+    ? (span * 0.12) / maximumDisplacement
+    : 1;
+  const nodeById = new Map(normalizedNodes.map((node) => [node.id, node]));
+  const renderedElements = elements
+    .map((element) => {
+      const firstNode = nodeById.get(element?.node1);
+      const secondNode = nodeById.get(element?.node2);
+      if (!firstNode || !secondNode) {
+        return '';
+      }
+      const firstDisplacement = displacementByNode.get(firstNode.id) ?? { ux: 0, uy: 0 };
+      const secondDisplacement = displacementByNode.get(secondNode.id) ?? { ux: 0, uy: 0 };
+      const firstX = firstNode.x + firstDisplacement.ux * deformationScale;
+      const firstY = firstNode.y + firstDisplacement.uy * deformationScale;
+      const secondX = secondNode.x + secondDisplacement.ux * deformationScale;
+      const secondY = secondNode.y + secondDisplacement.uy * deformationScale;
+      return (
+        `<line class="deformation-original" x1="${formatSvgNumber(firstNode.x)}" y1="${formatSvgNumber(firstNode.y)}" ` +
+        `x2="${formatSvgNumber(secondNode.x)}" y2="${formatSvgNumber(secondNode.y)}" />` +
+        `<line class="deformation-deformed" data-element="${escapeHtml(element?.id ?? '')}" ` +
+        `x1="${formatSvgNumber(firstX)}" y1="${formatSvgNumber(firstY)}" ` +
+        `x2="${formatSvgNumber(secondX)}" y2="${formatSvgNumber(secondY)}" />`
+      );
+    })
+    .join('');
+  const renderedNodes = normalizedNodes
+    .map((node) => {
+      const displacement = displacementByNode.get(node.id) ?? { ux: 0, uy: 0 };
+      const x = node.x + displacement.ux * deformationScale;
+      const y = node.y + displacement.uy * deformationScale;
+      return (
+        `<circle class="deformation-node" data-node="${escapeHtml(node.id)}" ` +
+        `cx="${formatSvgNumber(x)}" cy="${formatSvgNumber(y)}" r="${formatSvgNumber(span * 0.018)}">` +
+        `<title>节点 ${escapeHtml(node.id)}</title></circle>`
+      );
+    })
+    .join('');
+
+  return (
+    `<svg class="analysis-svg deformation-svg" viewBox="${formatSvgNumber(minX - padding)} ${formatSvgNumber(minY - padding)} ` +
+    `${formatSvgNumber(span + padding * 2)} ${formatSvgNumber(span + padding * 2)}" role="img" aria-label="节点与杆件变形图" ` +
+    'xmlns="http://www.w3.org/2000/svg">' +
+    '<g class="svg-legend"><line class="deformation-original" x1="0" y1="0" x2="0.12" y2="0" />' +
+    '<text x="0.14" y="0.02">原始形状</text><line class="deformation-deformed" x1="0" y1="0.06" x2="0.12" y2="0.06" />' +
+    '<text x="0.14" y="0.08">变形后形状</text></g>' +
+    renderedElements +
+    renderedNodes +
+    '</svg>'
+  );
+}
+
+function renderAxialForceSvg(results) {
+  const elementResults = Array.isArray(results?.elementResults) ? results.elementResults : [];
+  if (elementResults.length === 0) {
+    return renderEmptySvg('analysis-svg axial-force-svg', '暂无可显示的轴力结果');
+  }
+
+  const forces = elementResults.map((result) =>
+    Number.isFinite(result?.axialForce) ? result.axialForce : 0
+  );
+  const maximumForce = Math.max(0, ...forces.map((force) => Math.abs(force)));
+  const scaleForce = maximumForce > 0 && Number.isFinite(maximumForce) ? maximumForce : 1;
+  const width = 800;
+  const height = 300;
+  const baseline = 150;
+  const chartPadding = 56;
+  const availableWidth = width - chartPadding * 2;
+  const step = availableWidth / elementResults.length;
+  const barWidth = Math.max(8, Math.min(48, step * 0.62));
+  const maximumBarHeight = 92;
+  const bars = elementResults
+    .map((result, index) => {
+      const force = forces[index];
+      const heightValue = Math.abs(force) / scaleForce * maximumBarHeight;
+      const x = chartPadding + step * index + (step - barWidth) / 2;
+      const className = force > 0 ? 'bar--tension' : force < 0 ? 'bar--compression' : 'bar--zero';
+      const y = force > 0 ? baseline - heightValue : force < 0 ? baseline : baseline - 2;
+      const safeHeight = force === 0 ? 4 : heightValue;
+      const labelY = force > 0 ? y - 10 : force < 0 ? y + safeHeight + 18 : baseline + 20;
+      const elementId = escapeHtml(result?.element ?? '');
+      const status = escapeHtml(result?.status ?? '');
+      return (
+        `<g class="axial-force-item"><title>单元 ${elementId}: ${escapeHtml(formatSvgNumber(force))} (${status})</title>` +
+        `<rect class="axial-force-bar ${className}" data-element="${elementId}" x="${formatSvgNumber(x)}" ` +
+        `y="${formatSvgNumber(y)}" width="${formatSvgNumber(barWidth)}" height="${formatSvgNumber(safeHeight)}" />` +
+        `<text class="axial-force-label" x="${formatSvgNumber(x + barWidth / 2)}" y="${formatSvgNumber(labelY)}" text-anchor="middle">${elementId}</text></g>`
+      );
+    })
+    .join('');
+
+  return (
+    '<svg class="analysis-svg axial-force-svg" viewBox="0 0 800 300" role="img" aria-label="单元轴力图" xmlns="http://www.w3.org/2000/svg">' +
+    `<line class="axial-force-baseline" x1="${chartPadding}" y1="${baseline}" x2="${width - chartPadding}" y2="${baseline}" />` +
+    '<g class="svg-legend svg-legend--axial"><rect class="axial-force-bar bar--tension" x="56" y="24" width="14" height="10" />' +
+    '<text x="76" y="34">拉力</text><rect class="axial-force-bar bar--compression" x="126" y="24" width="14" height="10" />' +
+    '<text x="146" y="34">压力</text><rect class="axial-force-bar bar--zero" x="196" y="24" width="14" height="10" />' +
+    '<text x="216" y="34">零轴力</text></g>' +
+    bars +
+    '</svg>'
+  );
 }
 
 function getEffectiveFileName(fileName) {
@@ -985,6 +1148,8 @@ function clearAnalysis(dom, state) {
     dom.elementResultsRows,
     dom.reactionResultsRows,
     dom.summaryResults,
+    dom.deformationSvg,
+    dom.axialForceSvg,
   ]) {
     if (rowsHost) {
       rowsHost.innerHTML = '';
@@ -1011,6 +1176,12 @@ function runAnalysis(state, dom) {
   try {
     state.analysis = { ok: true, results: JSON.parse(JSON.stringify(analysis.results)) };
     renderAnalysisTables(dom, state.analysis.results);
+    if (dom.deformationSvg) {
+      dom.deformationSvg.innerHTML = renderDeformationSvg(state.model, state.analysis.results);
+    }
+    if (dom.axialForceSvg) {
+      dom.axialForceSvg.innerHTML = renderAxialForceSvg(state.analysis.results);
+    }
     state.lastError = '';
     updateStatusPanels(dom, state);
   } catch (error) {
@@ -1396,5 +1567,7 @@ if (typeof module !== 'undefined' && module.exports) {
     serializeModel,
     analyzeModel,
     buildCommand,
+    renderDeformationSvg,
+    renderAxialForceSvg,
   };
 }
