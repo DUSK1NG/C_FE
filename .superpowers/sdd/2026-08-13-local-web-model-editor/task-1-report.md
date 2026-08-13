@@ -163,3 +163,123 @@ fem --input 'my model.model'
 fem --input 'unsafe;$(echo pwned).model'
 fem --input 'owner''s.model'
 ```
+
+## Fix Round 3
+
+### Regression Test Added
+
+`tests/test_web_model.js` now performs a real Windows PowerShell execution probe when `process.platform === 'win32'`:
+
+- it launches `powershell.exe -NoProfile`
+- defines a fake `fem` function that captures `$args`
+- defines an `echo` function that flips a flag if `$()` is ever executed
+- runs `Invoke-Expression` on the string returned by `buildCommand()`
+- asserts the parsed argv is exactly:
+  - `my model.model`
+  - `unsafe;$(echo pwned).model`
+  - `owner's.model`
+- asserts the `$()` payload never runs
+
+On non-Windows platforms, the test prints a skip message and exits without probing PowerShell.
+
+### Red Run Before Fix
+
+`& 'C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' 'tests\test_web_model.js'`
+
+Output:
+
+```text
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    '--input',
++   'my',
++   'model.model'
+-   'my model.model'
+  ]
+```
+
+### Fix Applied
+
+`web/app.js` continues to use PowerShell-style shell quoting:
+
+- outer single quotes around the argument
+- embedded single quotes doubled to `''`
+
+### Green Runs After Fix
+
+`& 'C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' 'tests\test_web_model.js'`
+
+Output:
+
+```text
+web model tests passed
+```
+
+`@'
+const { spawnSync } = require('node:child_process');
+const { buildCommand } = require('./web/app.js');
+
+function probe(fileName) {
+  const script = `
+    Remove-Item Alias:echo -ErrorAction SilentlyContinue
+    $script:ExecutedDollar = $false
+    function echo {
+      param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+      $script:ExecutedDollar = $true
+      return 'pwned'
+    }
+    function fem {
+      param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+      $script:CapturedArgs = @($Args)
+    }
+    Invoke-Expression $env:BUILD_COMMAND
+    [pscustomobject]@{
+      Args = $script:CapturedArgs
+      ExecutedDollar = $script:ExecutedDollar
+    } | ConvertTo-Json -Compress
+  `;
+
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', script], {
+    encoding: 'utf8',
+    env: { ...process.env, BUILD_COMMAND: buildCommand(fileName) },
+  });
+
+  return JSON.parse(result.stdout.trim());
+}
+
+console.log(JSON.stringify([
+  probe('my model.model'),
+  probe('unsafe;$(echo pwned).model'),
+  probe("owner's.model"),
+], null, 2));
+'@ | & 'C:\Users\jking1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' -`
+
+Output:
+
+```text
+[
+  {
+    "Args": [
+      "--input",
+      "my model.model"
+    ],
+    "ExecutedDollar": false
+  },
+  {
+    "Args": [
+      "--input",
+      "unsafe;$(echo pwned).model"
+    ],
+    "ExecutedDollar": false
+  },
+  {
+    "Args": [
+      "--input",
+      "owner's.model"
+    ],
+    "ExecutedDollar": false
+  }
+]
+```
