@@ -460,12 +460,27 @@ function createSquareMatrix(size) {
 
 function solveLinearSystem(matrix, vector) {
   const size = vector.length;
-  const augmented = matrix.map((row, index) => [...row, vector[index]]);
-  const largestEntry = augmented.reduce(
-    (largest, row) => Math.max(largest, ...row.map((value) => Math.abs(value))),
+  const scaleFactors = matrix.map((row, index) => {
+    const diagonal = Math.abs(row[index]);
+    if (!Number.isFinite(diagonal) || diagonal === 0) {
+      throw new Error('Model stiffness matrix is singular or the structure is a mechanism');
+    }
+    return 1 / Math.sqrt(diagonal);
+  });
+  const augmented = matrix.map((row, rowIndex) => [
+    ...row.map(
+      (value, columnIndex) =>
+        (value * scaleFactors[rowIndex]) * scaleFactors[columnIndex]
+    ),
+    vector[rowIndex] * scaleFactors[rowIndex],
+  ]);
+  const largestMatrixEntry = augmented.reduce(
+    (largest, row) =>
+      Math.max(largest, ...row.slice(0, size).map((value) => Math.abs(value))),
     0
   );
-  const pivotTolerance = Math.max(1, largestEntry) * Number.EPSILON * Math.max(1, size);
+  const pivotTolerance =
+    Math.max(1, largestMatrixEntry) * Number.EPSILON * Math.max(1, size);
 
   for (let column = 0; column < size; column += 1) {
     let pivotRow = column;
@@ -496,7 +511,7 @@ function solveLinearSystem(matrix, vector) {
     }
   }
 
-  const solution = augmented.map((row) => row[size]);
+  const solution = augmented.map((row, index) => row[size] * scaleFactors[index]);
   if (!solution.every(Number.isFinite)) {
     throw new Error('Model solution contains non-finite values');
   }
@@ -572,14 +587,18 @@ function analyzeModel(model) {
       }
     }
 
+    if (freeDofs.length === 0) {
+      throw new Error('Model has no free degrees of freedom to solve');
+    }
+
     const displacements = Array(degreeCount).fill(0);
-    if (freeDofs.length > 0) {
-      const reducedStiffness = freeDofs.map((row) => freeDofs.map((column) => stiffness[row][column]));
-      const reducedLoads = freeDofs.map((dof) => loads[dof]);
-      const freeDisplacements = solveLinearSystem(reducedStiffness, reducedLoads);
-      for (let index = 0; index < freeDofs.length; index += 1) {
-        displacements[freeDofs[index]] = freeDisplacements[index];
-      }
+    const reducedStiffness = freeDofs.map((row) =>
+      freeDofs.map((column) => stiffness[row][column])
+    );
+    const reducedLoads = freeDofs.map((dof) => loads[dof]);
+    const freeDisplacements = solveLinearSystem(reducedStiffness, reducedLoads);
+    for (let index = 0; index < freeDofs.length; index += 1) {
+      displacements[freeDofs[index]] = freeDisplacements[index];
     }
 
     const internalForces = stiffness.map((row) =>
@@ -882,33 +901,41 @@ function renderDeformationSvg(model, results) {
   if (!Number.isFinite(span) || span <= 0) {
     return renderEmptySvg('analysis-svg deformation-svg', '暂无可显示的变形结果');
   }
-  const requestedDisplayScale = Math.max(1, MINIMUM_DEFORMATION_DISPLAY_SPAN / span);
-  const displayScale = Number.isFinite(requestedDisplayScale) ? requestedDisplayScale : 1;
-  const displaySpan = Math.max(span * displayScale, MINIMUM_DEFORMATION_DISPLAY_SPAN);
+  const displaySpan = Math.max(span, MINIMUM_DEFORMATION_DISPLAY_SPAN);
   const normalizedNodes = nodes.map((node) => ({
     ...node,
-    x: (node.x - minX) * displayScale,
-    y: (node.y - minY) * displayScale,
+    x: ((node.x - minX) / span) * displaySpan,
+    y: ((node.y - minY) / span) * displaySpan,
   }));
   const padding = displaySpan * 0.14;
   const displacementByNode = new Map(
     displacements.map((result) => [
       result?.node,
       {
-        ux: Number.isFinite(result?.ux) ? result.ux * displayScale : 0,
-        uy: Number.isFinite(result?.uy) ? result.uy * displayScale : 0,
+        ux: Number.isFinite(result?.ux) ? result.ux : 0,
+        uy: Number.isFinite(result?.uy) ? result.uy : 0,
       },
     ])
   );
-  const maximumDisplacement = Math.max(
+  const maximumDisplacementComponent = Math.max(
     0,
-    ...[...displacementByNode.values()].map(({ ux, uy }) =>
-      Number.isFinite(ux) && Number.isFinite(uy) ? Math.hypot(ux, uy) : 0
-    )
+    ...[...displacementByNode.values()].flatMap(({ ux, uy }) => [Math.abs(ux), Math.abs(uy)])
   );
-  const deformationScale = maximumDisplacement > 0 && Number.isFinite(maximumDisplacement)
-    ? (displaySpan * 0.12) / maximumDisplacement
-    : 1;
+  const normalizedDisplacementByNode = new Map(
+    [...displacementByNode].map(([node, { ux, uy }]) => [
+      node,
+      maximumDisplacementComponent > 0
+        ? { ux: ux / maximumDisplacementComponent, uy: uy / maximumDisplacementComponent }
+        : { ux: 0, uy: 0 },
+    ])
+  );
+  const maximumNormalizedDisplacement = Math.max(
+    0,
+    ...[...normalizedDisplacementByNode.values()].map(({ ux, uy }) => Math.hypot(ux, uy))
+  );
+  const deformationScale = maximumNormalizedDisplacement > 0
+    ? (displaySpan * 0.12) / maximumNormalizedDisplacement
+    : 0;
   const nodeById = new Map(normalizedNodes.map((node) => [node.id, node]));
   const renderedElements = elements
     .map((element) => {
@@ -917,8 +944,8 @@ function renderDeformationSvg(model, results) {
       if (!firstNode || !secondNode) {
         return '';
       }
-      const firstDisplacement = displacementByNode.get(firstNode.id) ?? { ux: 0, uy: 0 };
-      const secondDisplacement = displacementByNode.get(secondNode.id) ?? { ux: 0, uy: 0 };
+      const firstDisplacement = normalizedDisplacementByNode.get(firstNode.id) ?? { ux: 0, uy: 0 };
+      const secondDisplacement = normalizedDisplacementByNode.get(secondNode.id) ?? { ux: 0, uy: 0 };
       const firstX = firstNode.x + firstDisplacement.ux * deformationScale;
       const firstY = firstNode.y + firstDisplacement.uy * deformationScale;
       const secondX = secondNode.x + secondDisplacement.ux * deformationScale;
@@ -934,7 +961,7 @@ function renderDeformationSvg(model, results) {
     .join('');
   const renderedNodes = normalizedNodes
     .map((node) => {
-      const displacement = displacementByNode.get(node.id) ?? { ux: 0, uy: 0 };
+      const displacement = normalizedDisplacementByNode.get(node.id) ?? { ux: 0, uy: 0 };
       const x = node.x + displacement.ux * deformationScale;
       const y = node.y + displacement.uy * deformationScale;
       return (
@@ -949,13 +976,14 @@ function renderDeformationSvg(model, results) {
   const legendLength = displaySpan * 0.12;
   const legendLabelOffset = displaySpan * 0.02;
   const legendLineGap = displaySpan * 0.08;
+  const legendFontSize = displaySpan * 0.055;
   const legend =
     `<g class="svg-legend"><line class="deformation-original" x1="${formatSvgNumber(legendX)}" ` +
     `y1="${formatSvgNumber(legendY)}" x2="${formatSvgNumber(legendX + legendLength)}" y2="${formatSvgNumber(legendY)}" />` +
-    `<text x="${formatSvgNumber(legendX + legendLength + legendLabelOffset)}" y="${formatSvgNumber(legendY + legendLabelOffset)}">原始形状</text>` +
+    `<text font-size="${formatSvgNumber(legendFontSize)}" x="${formatSvgNumber(legendX + legendLength + legendLabelOffset)}" y="${formatSvgNumber(legendY + legendLabelOffset)}">原始形状</text>` +
     `<line class="deformation-deformed" x1="${formatSvgNumber(legendX)}" y1="${formatSvgNumber(legendY + legendLineGap)}" ` +
     `x2="${formatSvgNumber(legendX + legendLength)}" y2="${formatSvgNumber(legendY + legendLineGap)}" />` +
-    `<text x="${formatSvgNumber(legendX + legendLength + legendLabelOffset)}" y="${formatSvgNumber(legendY + legendLineGap + legendLabelOffset)}">变形后形状</text></g>`;
+    `<text font-size="${formatSvgNumber(legendFontSize)}" x="${formatSvgNumber(legendX + legendLength + legendLabelOffset)}" y="${formatSvgNumber(legendY + legendLineGap + legendLabelOffset)}">变形后形状</text></g>`;
 
   return (
     `<svg class="analysis-svg deformation-svg" viewBox="${formatSvgNumber(-padding)} ${formatSvgNumber(-padding)} ` +

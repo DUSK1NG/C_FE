@@ -450,6 +450,94 @@ assert.ok(Number.isFinite(analyzed.results.nodeDisplacements[1].uy));
 assert.ok(Number.isFinite(analyzed.results.elementResults[0].stress));
 assert.ok(Math.abs(analyzed.results.summary.residualY) < 1e-7);
 
+const extremeSpanModel = {
+  nodes: [
+    { id: 1, x: 0, y: 0 },
+    { id: 2, x: 1e-320, y: 0 },
+  ],
+  elements: [{ id: 1, node1: 1, node2: 2 }],
+};
+const zeroExtremeDisplacements = {
+  nodeDisplacements: extremeSpanModel.nodes.map((node) => ({
+    node: node.id,
+    ux: 0,
+    uy: 0,
+    magnitude: 0,
+  })),
+};
+const extremeSpanSvg = renderDeformationSvg(extremeSpanModel, zeroExtremeDisplacements);
+const extremeOriginalSegment = extremeSpanSvg.match(
+  /<\/g><line class="deformation-original" x1="([^"]+)" y1="([^"]+)" x2="([^"]+)" y2="([^"]+)"/
+);
+assert.ok(extremeOriginalSegment, 'extreme-span original geometry should be rendered');
+const extremeOriginalCoordinates = extremeOriginalSegment.slice(1).map(Number);
+assert.ok(extremeOriginalCoordinates.every(Number.isFinite));
+assert.notDeepEqual(
+  extremeOriginalCoordinates.slice(0, 2),
+  extremeOriginalCoordinates.slice(2),
+  'distinct extreme-span nodes should remain visually distinct'
+);
+const extremeLegendFontSize = Number(
+  extremeSpanSvg.match(/<text font-size="([^"]+)"/)[1]
+);
+assert.ok(extremeLegendFontSize > 0 && extremeLegendFontSize < 0.0001);
+assert.doesNotMatch(extremeSpanSvg, /(?:NaN|Infinity)/);
+
+const regularSpanSvg = renderDeformationSvg(
+  {
+    nodes: [
+      { id: 1, x: 0, y: 0 },
+      { id: 2, x: 100, y: 0 },
+    ],
+    elements: [{ id: 1, node1: 1, node2: 2 }],
+  },
+  zeroExtremeDisplacements
+);
+const regularLegendFontSize = Number(regularSpanSvg.match(/<text font-size="([^"]+)"/)[1]);
+assert.ok(regularLegendFontSize > 1 && regularLegendFontSize < 10);
+
+const fullyConstrainedAnalysis = analyzeModel({
+  ...makeValidModel(),
+  constraints: [
+    { node: 1, fix_x: 1, fix_y: 1 },
+    { node: 2, fix_x: 1, fix_y: 1 },
+  ],
+});
+assert.equal(fullyConstrainedAnalysis.ok, false);
+assert.match(fullyConstrainedAnalysis.error, /free|degree|dof|constraint/i);
+assert.equal('results' in fullyConstrainedAnalysis, false);
+
+const stiffnessContrastModel = {
+  nodes: [
+    { id: 1, x: 0, y: 0 },
+    { id: 2, x: 1, y: 0 },
+    { id: 3, x: 0, y: 2 },
+    { id: 4, x: 1, y: 2 },
+  ],
+  elements: [
+    { id: 1, node1: 1, node2: 2, E: 1e20, A: 1 },
+    { id: 2, node1: 3, node2: 4, E: 1, A: 1 },
+  ],
+  loads: [
+    { node: 2, fx: 1, fy: 0 },
+    { node: 4, fx: 1, fy: 0 },
+  ],
+  constraints: [
+    { node: 1, fix_x: 1, fix_y: 1 },
+    { node: 2, fix_x: 0, fix_y: 1 },
+    { node: 3, fix_x: 1, fix_y: 1 },
+    { node: 4, fix_x: 0, fix_y: 1 },
+  ],
+};
+const stiffnessContrastAnalysis = analyzeModel(stiffnessContrastModel);
+assert.equal(stiffnessContrastAnalysis.ok, true, stiffnessContrastAnalysis.error);
+assert.ok(
+  Math.abs(stiffnessContrastAnalysis.results.nodeDisplacements[1].ux - 1e-20) < 1e-35
+);
+assert.ok(
+  Math.abs(stiffnessContrastAnalysis.results.nodeDisplacements[3].ux - 1) < 1e-12
+);
+
 const analyzedTriangle = analyzeModel(triangleParsed.model);
 assert.equal(analyzedTriangle.ok, true, analyzedTriangle.error);
 assert.equal(analyzedTriangle.results.nodeDisplacements.length, 3);

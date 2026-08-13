@@ -55,3 +55,69 @@ Result: 13/13 targets compiled and ran successfully. Temporary files were cleane
 ## Browser limitation and deferred minor
 
 No live visual-browser acceptance was claimed. The deliverable is documented as a static local `file://` page; browser policy and local environment differences can still affect opening behavior. No deferred minor issue was identified by this verification.
+
+## Final-review concentrated fix pass
+
+This section records the later final-review fixes and supersedes the initial statement above that Task 5 changed documentation only. The concentrated pass changed only `web/app.js`, `web/styles.css`, `tests/test_web_model.js`, and this report; no C11 source or unrelated documentation was changed.
+
+### Fixes
+
+- The reduced stiffness system is now symmetrically scaled from its diagonal before elimination. Pivot tolerance is calculated from the scaled coefficient matrix only, excluding the load vector, and the scaled solution is transformed back to physical displacements. This keeps an independent stiffness-`1` subsystem solvable alongside a stiffness-`1e20` subsystem while preserving singular/mechanism detection.
+- An otherwise valid model with no free degrees of freedom now returns `{ ok: false, error }` and no `results` payload.
+- Deformation coordinates now use `((coordinate - minimum) / span) * displaySpan`, so a span near `1e-320` never requires an overflowing display-scale factor. Displacements are normalized through their largest finite component before display scaling, keeping generated geometry finite. Deformation-legend font size now tracks `displaySpan`; the fixed CSS size was removed so both tiny and ordinary viewBoxes remain readable.
+
+### TDD RED evidence
+
+Each regression was added before production code and run against the old implementation with the Codex-provided Node executable.
+
+1. Mixed stiffness (`1e20` and `1`) failed with exit 1:
+
+   ```text
+   AssertionError [ERR_ASSERTION]: Model stiffness matrix is singular or the structure is a mechanism
+   false !== true
+   at Object.<anonymous> (.../tests/test_web_model.js:476:8)
+   ```
+
+2. Fully constrained valid model failed with exit 1:
+
+   ```text
+   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+   true !== false
+   at Object.<anonymous> (.../tests/test_web_model.js:460:8)
+   ```
+
+3. Extreme deformation span failed with exit 1:
+
+   ```text
+   AssertionError [ERR_ASSERTION]: distinct extreme-span nodes should remain visually distinct
+   actual: [ 0, 0 ]
+   expected: [ 0, 0 ]
+   at Object.<anonymous> (.../tests/test_web_model.js:475:8)
+   ```
+
+### GREEN and final verification output
+
+Codex Node path:
+`C:/Users/jking1/AppData/Local/OpenAI/Codex/runtimes/cua_node/f1bf3cd3a5929acd/bin/node.exe`
+
+```text
+> "C:/Users/jking1/AppData/Local/OpenAI/Codex/runtimes/cua_node/f1bf3cd3a5929acd/bin/node.exe" --check web/app.js
+exit 0
+(no stdout)
+
+> "C:/Users/jking1/AppData/Local/OpenAI/Codex/runtimes/cua_node/f1bf3cd3a5929acd/bin/node.exe" --check tests/test_web_model.js
+exit 0
+(no stdout)
+
+> "C:/Users/jking1/AppData/Local/OpenAI/Codex/runtimes/cua_node/f1bf3cd3a5929acd/bin/node.exe" tests/test_web_model.js
+exit 0
+web model tests passed
+
+> git diff --check
+exit 0
+warning: in the working copy of 'tests/test_web_model.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'web/app.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'web/styles.css', LF will be replaced by CRLF the next time Git touches it
+```
+
+The line-ending messages are informational warnings from the repository's Windows Git configuration; `git diff --check` reported no whitespace errors.

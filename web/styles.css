@@ -317,7 +317,6 @@ button:disabled {
 .svg-legend text,
 .axial-force-label {
   fill: var(--text-muted);
-  font-size: 0.055px;
 }
 
 .svg-legend--axial text,
