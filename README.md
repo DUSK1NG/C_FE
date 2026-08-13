@@ -90,7 +90,9 @@ gcc -std=c11 -Wall -Wextra -pedantic src/main.c src/cli.c src/pipeline.c src/fem
 - `--format` 只接受 `txt`、`markdown`、`csv`。
 - `--include` 只接受 `nodes`、`elements`、`reactions`、`summary`。
 - `--format` / `--include` 会拒绝空条目、重复条目和未知条目。
+- 每个命令行选项最多出现一次；重复的标量或列表选项都会返回 `2`。
 - 输出文件后缀固定为 `.txt`、`.md`、`.csv`，并按该顺序尝试写出。
+- 任一所选输出目标已存在时，命令返回 `5`，且不会覆盖或删除已有文件。
 
 ## 输出格式与区段含义
 

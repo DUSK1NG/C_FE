@@ -194,6 +194,72 @@ static void assert_invalid_forms(void)
                         empty_entry_argv);
 }
 
+static void assert_duplicate_value_option_rejected(char option[],
+                                                   char first_value[],
+                                                   char second_value[])
+{
+    char arg0[] = "fem";
+    char input_option[] = "--input";
+    char input_path[] = "tests/data/medium.model";
+    char *argv[] = {
+        arg0, input_option, input_path, option, first_value, option,
+        second_value
+    };
+
+    assert_invalid_args((int)(sizeof(argv) / sizeof(argv[0])), argv);
+}
+
+static void assert_duplicate_options_rejected(void)
+{
+    char arg0[] = "fem";
+    char input_option[] = "--input";
+    char first_input[] = "tests/data/triangle.model";
+    char second_input[] = "tests/data/medium.model";
+    char *duplicate_input_argv[] = {
+        arg0, input_option, first_input, input_option, second_input
+    };
+
+    char output_dir_option[] = "--output-dir";
+    char first_output_dir[] = ".";
+    char second_output_dir[] = "results";
+    char prefix_option[] = "--prefix";
+    char first_prefix[] = "first";
+    char second_prefix[] = "second";
+    char format_option[] = "--format";
+    char first_format[] = "txt";
+    char second_format[] = "csv";
+    char include_option[] = "--include";
+    char first_include[] = "nodes";
+    char second_include[] = "summary";
+
+    char demo_arg0[] = "fem";
+    char demo_option[] = "--demo";
+    char *duplicate_demo_argv[] = {demo_arg0, demo_option, demo_option};
+
+    char help_arg0[] = "fem";
+    char help_option[] = "--help";
+    char *duplicate_help_argv[] = {help_arg0, help_option, help_option};
+
+    assert_invalid_args((int)(sizeof(duplicate_input_argv) /
+                              sizeof(duplicate_input_argv[0])),
+                        duplicate_input_argv);
+    assert_duplicate_value_option_rejected(output_dir_option,
+                                           first_output_dir,
+                                           second_output_dir);
+    assert_duplicate_value_option_rejected(prefix_option, first_prefix,
+                                           second_prefix);
+    assert_duplicate_value_option_rejected(format_option, first_format,
+                                           second_format);
+    assert_duplicate_value_option_rejected(include_option, first_include,
+                                           second_include);
+    assert_invalid_args((int)(sizeof(duplicate_demo_argv) /
+                              sizeof(duplicate_demo_argv[0])),
+                        duplicate_demo_argv);
+    assert_invalid_args((int)(sizeof(duplicate_help_argv) /
+                              sizeof(duplicate_help_argv[0])),
+                        duplicate_help_argv);
+}
+
 static void assert_help_text(void)
 {
     FILE *stream;
@@ -223,6 +289,7 @@ int main(void)
     assert_custom_values();
     assert_help();
     assert_invalid_forms();
+    assert_duplicate_options_rejected();
     assert_help_text();
     puts("CLI parser tests passed.");
     return 0;

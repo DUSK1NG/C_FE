@@ -1,5 +1,7 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "cli.h"
 #include "config.h"
@@ -96,14 +98,26 @@ static int build_output_path(char path[OUTPUT_PATH_CAPACITY],
 
 static void remove_output_files(
     char output_paths[OUTPUT_TARGET_COUNT][OUTPUT_PATH_CAPACITY],
-    int path_count)
+    const int created[OUTPUT_TARGET_COUNT])
 {
     int i;
 
-    for (i = 0; i < path_count; ++i) {
-        if (output_paths[i][0] != '\0') {
+    for (i = 0; i < OUTPUT_TARGET_COUNT; ++i) {
+        if (created[i] != 0 && output_paths[i][0] != '\0') {
             remove(output_paths[i]);
         }
+    }
+}
+
+static const char *output_status_message(FemStatus status)
+{
+    switch (status) {
+    case FEM_INVALID_ARGUMENT:
+        return "invalid output request";
+    case FEM_INPUT_ERROR:
+        return "unable to create or write output file";
+    default:
+        return "output writer failed";
     }
 }
 
@@ -118,36 +132,80 @@ static int write_selected_outputs(const CliOptions *options,
     };
     const FemOutputOptions output_options = {options->sections};
     char output_paths[OUTPUT_TARGET_COUNT][OUTPUT_PATH_CAPACITY] = {{0}};
-    int created_count = 0;
+    int created[OUTPUT_TARGET_COUNT] = {0};
     int i;
 
     for (i = 0; i < OUTPUT_TARGET_COUNT; ++i) {
-        FemStatus status;
+        if ((options->formats & output_targets[i].format_bit) == 0u) {
+            continue;
+        }
+
+        if (!build_output_path(output_paths[i], options->output_dir,
+                               options->prefix,
+                               output_targets[i].extension)) {
+            fprintf(stderr,
+                    "Output error: cannot construct path for %s output.\n",
+                    output_targets[i].extension);
+            remove_output_files(output_paths, created);
+            return EXIT_OUTPUT_ERROR;
+        }
+    }
+
+    for (i = 0; i < OUTPUT_TARGET_COUNT; ++i) {
+        FILE *reservation;
+        int saved_errno;
 
         if ((options->formats & output_targets[i].format_bit) == 0u) {
             continue;
         }
 
-        if (!build_output_path(output_paths[created_count], options->output_dir,
-                               options->prefix,
-                               output_targets[i].extension)) {
-            fprintf(stderr, "Output error: invalid output path.\n");
-            remove_output_files(output_paths, created_count);
+        errno = 0;
+        reservation = fopen(output_paths[i], "wbx");
+        saved_errno = errno;
+        if (reservation == NULL) {
+            fprintf(stderr, "Output error: cannot create %s: %s\n",
+                    output_paths[i],
+                    saved_errno != 0 ? strerror(saved_errno) :
+                                       "target exists or is not writable");
+            remove_output_files(output_paths, created);
             return EXIT_OUTPUT_ERROR;
         }
 
-        status = output_targets[i].writer(output_paths[created_count], model,
+        created[i] = 1;
+        errno = 0;
+        if (fclose(reservation) != 0) {
+            saved_errno = errno;
+            fprintf(stderr, "Output error: cannot prepare %s: %s\n",
+                    output_paths[i],
+                    saved_errno != 0 ? strerror(saved_errno) :
+                                       "failed to close reserved output file");
+            remove_output_files(output_paths, created);
+            return EXIT_OUTPUT_ERROR;
+        }
+    }
+
+    for (i = 0; i < OUTPUT_TARGET_COUNT; ++i) {
+        FemStatus status;
+        int saved_errno;
+
+        if ((options->formats & output_targets[i].format_bit) == 0u) {
+            continue;
+        }
+
+        errno = 0;
+        status = output_targets[i].writer(output_paths[i], model,
                                           results, &output_options);
+        saved_errno = errno;
         if (status != FEM_OK) {
-            ++created_count;
-            fprintf(stderr, "Output error: %s: %s\n",
-                    output_paths[created_count - 1],
-                    fem_status_message(status));
-            remove_output_files(output_paths, created_count);
+            fprintf(stderr, "Output error: %s: %s",
+                    output_paths[i], output_status_message(status));
+            if (saved_errno != 0) {
+                fprintf(stderr, " (%s)", strerror(saved_errno));
+            }
+            fprintf(stderr, "\n");
+            remove_output_files(output_paths, created);
             return EXIT_OUTPUT_ERROR;
         }
-
-        ++created_count;
     }
 
     return EXIT_SUCCESS;

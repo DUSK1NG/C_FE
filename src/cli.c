@@ -7,6 +7,16 @@ typedef struct {
     unsigned bit;
 } NameBit;
 
+enum {
+    CLI_SEEN_INPUT = 1u << 0,
+    CLI_SEEN_OUTPUT_DIR = 1u << 1,
+    CLI_SEEN_PREFIX = 1u << 2,
+    CLI_SEEN_FORMAT = 1u << 3,
+    CLI_SEEN_INCLUDE = 1u << 4,
+    CLI_SEEN_DEMO = 1u << 5,
+    CLI_SEEN_HELP = 1u << 6
+};
+
 static const unsigned k_all_formats = FEM_FORMAT_TXT | FEM_FORMAT_MARKDOWN |
                                        FEM_FORMAT_CSV;
 static const unsigned k_all_sections = FEM_OUTPUT_NODES | FEM_OUTPUT_ELEMENTS |
@@ -30,6 +40,21 @@ static int reject(char error_message[], size_t error_size, const char *message)
 {
     set_error(error_message, error_size, message);
     return 2;
+}
+
+static int mark_option_seen(unsigned *seen_options, unsigned option_bit,
+                            const char *option_name,
+                            char error_message[], size_t error_size)
+{
+    if ((*seen_options & option_bit) != 0u) {
+        char message[128];
+
+        snprintf(message, sizeof(message), "重复选项：%s", option_name);
+        return reject(error_message, error_size, message);
+    }
+
+    *seen_options |= option_bit;
+    return 0;
 }
 
 static int match_name(const char *value, size_t length, const NameBit *items,
@@ -120,6 +145,7 @@ int cli_parse_args(int argc, char *argv[], CliOptions *options,
                    char error_message[], size_t error_size)
 {
     int i;
+    unsigned seen_options = 0u;
 
     if (options == NULL) {
         return reject(error_message, error_size, "选项输出结构不能为空");
@@ -141,16 +167,28 @@ int cli_parse_args(int argc, char *argv[], CliOptions *options,
         const char *arg = argv[i];
 
         if (strcmp(arg, "--help") == 0) {
+            if (mark_option_seen(&seen_options, CLI_SEEN_HELP, arg,
+                                 error_message, error_size) != 0) {
+                return 2;
+            }
             options->help = 1;
-            return 0;
+            continue;
         }
 
         if (strcmp(arg, "--demo") == 0) {
+            if (mark_option_seen(&seen_options, CLI_SEEN_DEMO, arg,
+                                 error_message, error_size) != 0) {
+                return 2;
+            }
             options->demo = 1;
             continue;
         }
 
         if (strcmp(arg, "--input") == 0) {
+            if (mark_option_seen(&seen_options, CLI_SEEN_INPUT, arg,
+                                 error_message, error_size) != 0) {
+                return 2;
+            }
             if (i + 1 >= argc || starts_with_option(argv[i + 1])) {
                 return reject(error_message, error_size,
                               "--input 需要文件路径");
@@ -160,6 +198,10 @@ int cli_parse_args(int argc, char *argv[], CliOptions *options,
         }
 
         if (strcmp(arg, "--output-dir") == 0) {
+            if (mark_option_seen(&seen_options, CLI_SEEN_OUTPUT_DIR, arg,
+                                 error_message, error_size) != 0) {
+                return 2;
+            }
             if (i + 1 >= argc || starts_with_option(argv[i + 1])) {
                 return reject(error_message, error_size,
                               "--output-dir 需要目录路径");
@@ -169,6 +211,10 @@ int cli_parse_args(int argc, char *argv[], CliOptions *options,
         }
 
         if (strcmp(arg, "--prefix") == 0) {
+            if (mark_option_seen(&seen_options, CLI_SEEN_PREFIX, arg,
+                                 error_message, error_size) != 0) {
+                return 2;
+            }
             if (i + 1 >= argc || starts_with_option(argv[i + 1])) {
                 return reject(error_message, error_size,
                               "--prefix 需要文件前缀");
@@ -184,6 +230,10 @@ int cli_parse_args(int argc, char *argv[], CliOptions *options,
                 {"csv", FEM_FORMAT_CSV},
             };
 
+            if (mark_option_seen(&seen_options, CLI_SEEN_FORMAT, arg,
+                                 error_message, error_size) != 0) {
+                return 2;
+            }
             if (i + 1 >= argc || starts_with_option(argv[i + 1])) {
                 return reject(error_message, error_size,
                               "--format 需要格式列表");
@@ -204,6 +254,10 @@ int cli_parse_args(int argc, char *argv[], CliOptions *options,
                 {"summary", FEM_OUTPUT_SUMMARY},
             };
 
+            if (mark_option_seen(&seen_options, CLI_SEEN_INCLUDE, arg,
+                                 error_message, error_size) != 0) {
+                return 2;
+            }
             if (i + 1 >= argc || starts_with_option(argv[i + 1])) {
                 return reject(error_message, error_size,
                               "--include 需要区段列表");
@@ -227,6 +281,10 @@ int cli_parse_args(int argc, char *argv[], CliOptions *options,
             snprintf(message, sizeof(message), "未知参数：%s", arg);
             return reject(error_message, error_size, message);
         }
+    }
+
+    if (options->help != 0) {
+        return 0;
     }
 
     if (options->demo != 0 && options->input_path != NULL) {
@@ -267,7 +325,8 @@ void cli_print_help(FILE *stream)
             "  --format LIST    指定输出格式，可选 txt、markdown、csv\n"
             "  --include LIST   指定输出区段，可选 nodes、elements、reactions、summary\n"
             "  --demo           保留 Stage 1 演示模式\n"
-            "  --help           显示帮助\n\n"
+            "  --help           显示帮助\n"
+            "  每个选项最多出现一次；已有输出文件不会被覆盖\n\n"
             "示例：\n"
             "  fem --input tests/data/medium.model\n"
             "  fem --demo\n"

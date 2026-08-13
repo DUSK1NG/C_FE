@@ -110,8 +110,10 @@ static void test_selected_all_sections_use_selected_format(void)
     FemOutputOptions options;
     char buffer[32768];
     const char *selected_txt_path = "selected_all_results.txt";
+    const char *selected_markdown_path = "selected_all_results.md";
     const char *selected_csv_path = "selected_all_results.csv";
     const char *legacy_txt_path = "legacy_all_results.txt";
+    const char *legacy_markdown_path = "legacy_all_results.md";
     const char *legacy_csv_path = "legacy_all_results.csv";
 
     assert(read_model_file("tests/data/medium.model", &model) == FEM_OK);
@@ -135,6 +137,30 @@ static void test_selected_all_sections_use_selected_format(void)
     assert_not_contains(buffer,
                         "node_count element_count residual_fx residual_fy\n");
     assert(remove(legacy_txt_path) == 0);
+
+    assert(write_results_markdown_selected(selected_markdown_path, &model,
+                                           &results, &options) == FEM_OK);
+    assert(read_file(selected_markdown_path, buffer, sizeof(buffer)) != 0);
+    assert_contains(
+        buffer,
+        "| Node ID | ux | uy | x | y | fx | fy | fix_x | fix_y |\n");
+    assert_contains(
+        buffer,
+        "| Node Count | Element Count | Residual Fx | Residual Fy |\n");
+    assert(remove(selected_markdown_path) == 0);
+
+    assert(write_results_markdown(legacy_markdown_path, &model, &results) ==
+           FEM_OK);
+    assert(read_file(legacy_markdown_path, buffer, sizeof(buffer)) != 0);
+    assert_contains(buffer, "| Node ID | ux | uy |\n");
+    assert_not_contains(
+        buffer,
+        "| Node ID | ux | uy | x | y | fx | fy | fix_x | fix_y |\n");
+    assert_contains(buffer, "| Residual Fx | Residual Fy |\n");
+    assert_not_contains(
+        buffer,
+        "| Node Count | Element Count | Residual Fx | Residual Fy |\n");
+    assert(remove(legacy_markdown_path) == 0);
 
     assert(write_results_csv_selected(selected_csv_path, &model, &results,
                                       &options) == FEM_OK);
