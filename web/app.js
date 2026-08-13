@@ -393,17 +393,112 @@ function buildCommand(fileName) {
   return `fem --input ${quotePowerShellArgument(fileName)}`;
 }
 
+const SHELL_SECTION_CONFIG = [
+  {
+    key: 'nodes',
+    rowsId: 'nodes-rows',
+    title: '节点',
+    columnCount: 4,
+    placeholder: '页面外壳已就绪，节点编辑会在后续任务中接入。',
+  },
+  {
+    key: 'elements',
+    rowsId: 'elements-rows',
+    title: '单元',
+    columnCount: 6,
+    placeholder: '页面外壳已就绪，单元编辑会在后续任务中接入。',
+  },
+  {
+    key: 'loads',
+    rowsId: 'loads-rows',
+    title: '荷载',
+    columnCount: 4,
+    placeholder: '页面外壳已就绪，荷载编辑会在后续任务中接入。',
+  },
+  {
+    key: 'constraints',
+    rowsId: 'constraints-rows',
+    title: '约束',
+    columnCount: 4,
+    placeholder: '页面外壳已就绪，约束编辑会在后续任务中接入。',
+  },
+];
+
+function createShellState() {
+  return {
+    model: createEmptyModel(),
+    fileName: 'custom.model',
+  };
+}
+
+function getShellDom(doc) {
+  const dom = {
+    importModelInput: doc.getElementById('import-model-input'),
+    statusMessage: doc.getElementById('status-message'),
+    errorMessage: doc.getElementById('error-message'),
+    serializedPreview: doc.getElementById('serialized-preview'),
+    commandPreview: doc.getElementById('command-preview'),
+  };
+
+  for (const section of SHELL_SECTION_CONFIG) {
+    dom[section.key] = doc.getElementById(section.key);
+    dom[section.rowsId] = doc.getElementById(section.rowsId);
+  }
+
+  return dom;
+}
+
+function renderShellRows(dom) {
+  for (const section of SHELL_SECTION_CONFIG) {
+    const rowsHost = dom[section.rowsId];
+    if (!rowsHost) {
+      continue;
+    }
+    rowsHost.innerHTML =
+      `<tr>` +
+      `<td class="placeholder-cell" colspan="${section.columnCount}">${section.placeholder}</td>` +
+      `</tr>`;
+  }
+}
+
+function updateShellPanels(dom, state) {
+  if (dom.statusMessage) {
+    dom.statusMessage.className = 'status status--ok';
+    dom.statusMessage.textContent = '页面结构与响应式布局已加载，后续任务将补齐完整编辑能力。';
+  }
+  if (dom.errorMessage) {
+    dom.errorMessage.className = 'status status--error';
+    dom.errorMessage.textContent = '当前没有错误；导入、导出和行编辑将在后续任务接入。';
+  }
+  if (dom.serializedPreview) {
+    dom.serializedPreview.textContent =
+      '# 预览将在后续任务根据当前表格数据生成\n' +
+      'NODES ...\nELEMENTS ...\nLOADS ...\nCONSTRAINTS ...';
+  }
+  if (dom.commandPreview) {
+    dom.commandPreview.textContent = buildCommand(state.fileName);
+  }
+}
+
 function initBrowserApp() {
   if (typeof document === 'undefined') {
     return;
   }
+  const state = createShellState();
+  const dom = getShellDom(document);
   const api = {
     createEmptyModel,
     parseModel,
     validateModel,
     serializeModel,
     buildCommand,
+    state,
+    dom,
   };
+
+  renderShellRows(dom);
+  updateShellPanels(dom, state);
+
   if (typeof window !== 'undefined') {
     window.webModelEditor = api;
   }

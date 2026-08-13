@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   buildCommand,
+  createEmptyModel,
   parseModel,
   validateModel,
   serializeModel,
@@ -59,6 +60,74 @@ function makeValidModel() {
       { node: 1, fix_x: 1, fix_y: 1 },
     ],
   };
+}
+
+function makeFakeElement(id) {
+  return {
+    id,
+    className: '',
+    dataset: {},
+    disabled: false,
+    hidden: false,
+    innerHTML: '',
+    textContent: '',
+    value: '',
+    listeners: {},
+    addEventListener(type, listener) {
+      this.listeners[type] = listener;
+    },
+    setAttribute(name, value) {
+      this[name] = value;
+    },
+    removeAttribute(name) {
+      delete this[name];
+    },
+  };
+}
+
+function loadAppWithFakeDom() {
+  const ids = [
+    'import-model-input',
+    'status-message',
+    'error-message',
+    'serialized-preview',
+    'command-preview',
+    'nodes',
+    'nodes-rows',
+    'elements',
+    'elements-rows',
+    'loads',
+    'loads-rows',
+    'constraints',
+    'constraints-rows',
+  ];
+  const elements = new Map(ids.map((id) => [id, makeFakeElement(id)]));
+  const fakeDocument = {
+    body: makeFakeElement('body'),
+    getElementById(id) {
+      return elements.get(id) ?? null;
+    },
+  };
+  const fakeWindow = {};
+  const modulePath = require.resolve('../web/app.js');
+  const previousDocument = global.document;
+  const previousWindow = global.window;
+  delete require.cache[modulePath];
+  global.document = fakeDocument;
+  global.window = fakeWindow;
+  const reloadedModule = require('../web/app.js');
+  delete require.cache[modulePath];
+  if (previousDocument === undefined) {
+    delete global.document;
+  } else {
+    global.document = previousDocument;
+  }
+  if (previousWindow === undefined) {
+    delete global.window;
+  } else {
+    global.window = previousWindow;
+  }
+  return { elements, fakeDocument, fakeWindow, reloadedModule };
 }
 
 const parsed = parseModel(source);
@@ -421,5 +490,39 @@ assert.equal(
   "fem --input 'unsafe;$(echo pwned).model'"
 );
 assert.equal(buildCommand("owner's.model"), "fem --input 'owner''s.model'");
+
+const indexPath = path.join(__dirname, '..', 'web', 'index.html');
+assert.equal(fs.existsSync(indexPath), true, 'index.html should exist');
+const indexHtml = fs.readFileSync(indexPath, 'utf8');
+assert.match(indexHtml, /<link[^>]+href=["']\.\/styles\.css["']/);
+assert.match(indexHtml, /<script[^>]+src=["']\.\/app\.js["']/);
+for (const sectionId of ['nodes', 'elements', 'loads', 'constraints']) {
+  assert.match(
+    indexHtml,
+    new RegExp(`id=["']${sectionId}["']`),
+    `${sectionId} section should exist in index.html`
+  );
+}
+
+const browserRuntime = loadAppWithFakeDom();
+assert.equal(browserRuntime.fakeDocument.body.dataset.webModelEditorReady, 'true');
+assert.deepEqual(browserRuntime.fakeWindow.webModelEditor.state.model, createEmptyModel());
+assert.equal(browserRuntime.fakeWindow.webModelEditor.dom.nodes.id, 'nodes');
+assert.equal(
+  browserRuntime.elements.get('status-message').textContent.length > 0,
+  true,
+  'status message should be initialized'
+);
+assert.equal(
+  browserRuntime.elements.get('command-preview').textContent,
+  buildCommand('custom.model')
+);
+for (const rowsId of ['nodes-rows', 'elements-rows', 'loads-rows', 'constraints-rows']) {
+  assert.equal(
+    browserRuntime.elements.get(rowsId).innerHTML.length > 0,
+    true,
+    `${rowsId} should render placeholder rows`
+  );
+}
 
 console.log('web model tests passed');

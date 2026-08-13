@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>本地网页模型配置器</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="hero">
+        <p class="eyebrow">Local Web Model Editor</p>
+        <h1>本地网页模型配置器</h1>
+        <p class="hero-copy">
+          直接在浏览器里整理二维桁架模型。当前任务只完成页面外壳和响应式布局，后续再接入完整编辑与导入导出行为。
+        </p>
+      </header>
+
+      <section class="toolbar-card">
+        <div class="toolbar" aria-label="模型操作">
+          <button id="new-model-button" type="button">新建模型</button>
+          <button id="load-example-button" type="button">加载示例</button>
+          <button id="import-model-button" type="button">导入 .model</button>
+          <button id="export-model-button" type="button">导出 .model</button>
+          <input id="import-model-input" type="file" accept=".model" hidden>
+        </div>
+      </section>
+
+      <section class="status-grid" aria-label="状态与预览">
+        <div class="status-panel">
+          <h2>当前状态</h2>
+          <p id="status-message" class="status status--ok" aria-live="polite"></p>
+          <p id="error-message" class="status status--error" aria-live="polite"></p>
+        </div>
+
+        <div class="preview-panel">
+          <h2>.model 预览</h2>
+          <pre id="serialized-preview"></pre>
+        </div>
+
+        <div class="preview-panel">
+          <h2>命令行提示</h2>
+          <code id="command-preview"></code>
+        </div>
+      </section>
+
+      <section class="editor-grid" aria-label="模型分区">
+        <section id="nodes" class="editor-card" aria-labelledby="nodes-title">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">Section 1</p>
+              <h2 id="nodes-title">节点</h2>
+            </div>
+            <button id="add-node-button" type="button">新增节点</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">X</th>
+                  <th scope="col">Y</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="nodes-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="elements" class="editor-card" aria-labelledby="elements-title">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">Section 2</p>
+              <h2 id="elements-title">单元</h2>
+            </div>
+            <button id="add-element-button" type="button">新增单元</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">起点节点</th>
+                  <th scope="col">终点节点</th>
+                  <th scope="col">E</th>
+                  <th scope="col">A</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="elements-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="loads" class="editor-card" aria-labelledby="loads-title">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">Section 3</p>
+              <h2 id="loads-title">荷载</h2>
+            </div>
+            <button id="add-load-button" type="button">新增荷载</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">节点</th>
+                  <th scope="col">Fx</th>
+                  <th scope="col">Fy</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="loads-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="constraints" class="editor-card" aria-labelledby="constraints-title">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">Section 4</p>
+              <h2 id="constraints-title">约束</h2>
+            </div>
+            <button id="add-constraint-button" type="button">新增约束</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">节点</th>
+                  <th scope="col">fix_x</th>
+                  <th scope="col">fix_y</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="constraints-rows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
