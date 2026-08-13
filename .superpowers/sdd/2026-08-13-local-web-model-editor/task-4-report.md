@@ -71,7 +71,7 @@ Red evidence note:
 
 ## Commit
 
-- Pending at report creation time: `<PENDING_COMMIT_HASH>`
+- `d6a0adf` — `feat: add model editing and file workflow`
 
 ## Concerns
 
