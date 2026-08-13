@@ -139,7 +139,54 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;');
 }
 
-function makeFakeElement(id) {
+function decodeHtmlAttribute(text) {
+  return String(text)
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+function parseDataAttributes(attributes) {
+  const dataset = {};
+  const regex = /data-([a-z0-9_-]+)="([^"]*)"/gi;
+  for (const match of attributes.matchAll(regex)) {
+    dataset[match[1].replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] =
+      decodeHtmlAttribute(match[2]);
+  }
+  return dataset;
+}
+
+function hydrateRenderedRows(host, markup) {
+  const rowRegex = /<tr(?: class="([^"]*)")?>([\s\S]*?)<\/tr>/gi;
+  for (const rowMatch of markup.matchAll(rowRegex)) {
+    const row = makeFakeElement(`row-${host.children.length}`, host.ownerDocument);
+    row.tagName = 'TR';
+    row.className = rowMatch[1] ?? '';
+    host.appendChild(row);
+
+    const rowMarkup = rowMatch[2];
+    const controlRegex = /<(input|select|button)\b([^>]*)>([\s\S]*?<\/select>|[\s\S]*?<\/button>|)/gi;
+    for (const controlMatch of rowMarkup.matchAll(controlRegex)) {
+      const control = makeFakeElement(
+        `${controlMatch[1]}-${row.children.length}`,
+        host.ownerDocument
+      );
+      control.tagName = controlMatch[1].toUpperCase();
+      control.dataset = parseDataAttributes(controlMatch[2]);
+      const classMatch = /class="([^"]*)"/i.exec(controlMatch[2]);
+      control.className = classMatch?.[1] ?? '';
+      const valueMatch = /value="([^"]*)"/i.exec(controlMatch[2]);
+      if (valueMatch) {
+        control.value = decodeHtmlAttribute(valueMatch[1]);
+      }
+      row.appendChild(control);
+    }
+  }
+}
+
+function makeFakeElement(id, ownerDocument = null) {
   const element = {
     id,
     tagName: 'DIV',
@@ -153,6 +200,7 @@ function makeFakeElement(id) {
     parentNode: null,
     clickCount: 0,
     lastWriteMode: null,
+    ownerDocument,
     addEventListener(type, listener) {
       this.listeners[type] = listener;
     },
@@ -172,6 +220,29 @@ function makeFakeElement(id) {
       child.parentNode = null;
       return child;
     },
+    contains(node) {
+      if (!node) {
+        return false;
+      }
+      if (node === this) {
+        return true;
+      }
+      return this.children.some((child) => child.contains(node));
+    },
+    focus() {
+      if (this.ownerDocument) {
+        this.ownerDocument.activeElement = this;
+      }
+    },
+    blur() {
+      if (this.ownerDocument?.activeElement === this) {
+        this.ownerDocument.activeElement = null;
+      }
+    },
+    setSelectionRange(start, end) {
+      this.selectionStart = start;
+      this.selectionEnd = end;
+    },
     click() {
       this.clickCount += 1;
     },
@@ -186,8 +257,15 @@ function makeFakeElement(id) {
         return innerHTML;
       },
       set(nextValue) {
+        if (this.ownerDocument?.activeElement && this.contains(this.ownerDocument.activeElement)) {
+          this.ownerDocument.activeElement = null;
+        }
         innerHTML = String(nextValue);
         textContent = '';
+        this.children = [];
+        if (this.id.endsWith('-rows')) {
+          hydrateRenderedRows(this, innerHTML);
+        }
         this.lastWriteMode = 'innerHTML';
       },
     },
@@ -256,17 +334,14 @@ function loadAppWithFakeDom() {
     'constraints',
     'constraints-rows',
   ];
-  const elements = new Map(ids.map((id) => [id, makeFakeElement(id)]));
-  const createdObjectUrls = [];
-  const revokedObjectUrls = [];
-  const createdAnchors = [];
   const fakeDocument = {
-    body: makeFakeElement('body'),
+    activeElement: null,
+    body: null,
     getElementById(id) {
       return elements.get(id) ?? null;
     },
     createElement(tagName) {
-      const element = makeFakeElement(`${tagName}-${createdAnchors.length + 1}`);
+      const element = makeFakeElement(`${tagName}-${createdAnchors.length + 1}`, fakeDocument);
       element.tagName = String(tagName).toUpperCase();
       if (element.tagName === 'A') {
         createdAnchors.push(element);
@@ -274,6 +349,11 @@ function loadAppWithFakeDom() {
       return element;
     },
   };
+  const elements = new Map(ids.map((id) => [id, makeFakeElement(id, fakeDocument)]));
+  const createdObjectUrls = [];
+  const revokedObjectUrls = [];
+  const createdAnchors = [];
+  fakeDocument.body = makeFakeElement('body', fakeDocument);
   const fakeWindow = {
     URL: {
       createObjectURL(blob) {
@@ -327,6 +407,14 @@ function loadAppWithFakeDom() {
     revokedObjectUrls,
     createdAnchors,
   };
+}
+
+function getRenderedControl(rowsHost, rowIndex, fieldName) {
+  const row = rowsHost.children[rowIndex];
+  assert.ok(row, `expected rendered row ${rowIndex + 1}`);
+  const control = row.children.find((child) => child.dataset?.field === fieldName);
+  assert.ok(control, `expected rendered ${fieldName} control in row ${rowIndex + 1}`);
+  return control;
 }
 
 const parsed = parseModel(source);
@@ -805,13 +893,16 @@ async function runBrowserWorkflowAssertions() {
     await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
     assert.equal(elements.get('export-model-button').disabled, true);
     assert.match(elements.get('error-message').textContent, /NODES.*ID/i);
-    assert.match(elements.get('nodes-rows').innerHTML, /class="[^"]*invalid[^"]*"/i);
+    assert.match(getRenderedControl(elements.get('nodes-rows'), 2, 'id').parentNode.className, /invalid/i);
 
     duplicateNodeIdInput.value = '3';
     await dispatchEvent(elements.get('nodes'), 'input', { target: duplicateNodeIdInput });
     assert.equal(elements.get('export-model-button').disabled, false);
     assert.equal(elements.get('error-message').textContent, '');
-    assert.doesNotMatch(elements.get('nodes-rows').innerHTML, /class="[^"]*invalid[^"]*"/i);
+    assert.doesNotMatch(
+      getRenderedControl(elements.get('nodes-rows'), 2, 'id').parentNode.className,
+      /invalid/i
+    );
 
     const nodesBeforeEdit = elements.get('nodes-rows').innerHTML;
     const elementsBeforeEdit = elements.get('elements-rows').innerHTML;
@@ -828,6 +919,33 @@ async function runBrowserWorkflowAssertions() {
     assert.equal(elements.get('nodes-rows').innerHTML, nodesBeforeEdit);
     assert.equal(elements.get('elements-rows').innerHTML, elementsBeforeEdit);
     assert.match(elements.get('serialized-preview').textContent, /3 650 800/);
+
+    const realNodeIdInput = getRenderedControl(elements.get('nodes-rows'), 2, 'id');
+    realNodeIdInput.focus();
+    realNodeIdInput.value = '2';
+    realNodeIdInput.setSelectionRange(1, 1);
+    await dispatchEvent(elements.get('nodes'), 'input', { target: realNodeIdInput });
+    assert.equal(fakeWindow.webModelEditor.state.model.nodes[2].id, 2);
+    assert.equal(
+      fakeDocument.activeElement,
+      realNodeIdInput,
+      'focus should stay on the live input when the row becomes invalid'
+    );
+    assert.equal(realNodeIdInput.selectionStart, 1);
+    assert.equal(realNodeIdInput.selectionEnd, 1);
+
+    realNodeIdInput.value = '3';
+    realNodeIdInput.setSelectionRange(1, 1);
+    await dispatchEvent(elements.get('nodes'), 'input', { target: realNodeIdInput });
+    assert.equal(fakeWindow.webModelEditor.state.model.nodes[2].id, 3);
+    assert.equal(
+      fakeDocument.activeElement,
+      realNodeIdInput,
+      'focus should stay on the live input when the row returns to valid'
+    );
+    assert.equal(realNodeIdInput.selectionStart, 1);
+    assert.equal(realNodeIdInput.selectionEnd, 1);
+    assert.equal(elements.get('error-message').textContent, '');
 
     await dispatchEvent(elements.get('nodes'), 'click', {
       target: {

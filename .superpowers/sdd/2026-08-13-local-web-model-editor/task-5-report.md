@@ -77,3 +77,42 @@ web model tests passed
 ### Concerns
 
 - Existing page copy in the checked-in HTML/JS still contains earlier mojibake text outside the Task 5 scope. The new validation/count/limit behavior works and is covered by tests, but broader text cleanup was intentionally left untouched.
+
+## Fix round 1
+
+### Scope
+
+- Updated only `web/app.js` and `tests/test_web_model.js`.
+- Preserved the existing fake-DOM test enhancements and did not modify C code or Task 6 files.
+
+### Root cause and fix
+
+- `updateStatusPanels` called `renderAllSections` whenever the invalid-row signature changed.
+- That replaced every table body and therefore detached the currently focused input when its row became invalid or valid again.
+- Replaced that redraw with an in-place row-class update, leaving the existing input nodes, focus, and selection untouched.
+- Removed the unreachable legacy validation/status block after the unconditional return and the unreachable import-validation block after its return.
+
+### TDD evidence
+
+Red:
+
+```text
+AssertionError [ERR_ASSERTION]: focus should stay on the live input when the row becomes invalid
+actual: null
+```
+
+Green:
+
+```text
+web model tests passed
+```
+
+### Verification
+
+```text
+node.exe --check web/app.js
+Exit code: 0
+
+node.exe tests/test_web_model.js
+web model tests passed
+```

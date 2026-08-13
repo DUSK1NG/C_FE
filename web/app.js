@@ -749,6 +749,24 @@ function renderAllSections(dom, model, invalidRowMap = {}) {
   }
 }
 
+function updateInvalidRowClasses(dom, model, invalidRowMap) {
+  for (const section of BROWSER_SECTION_CONFIG) {
+    const rowsHost = dom[section.rowsId];
+    const records = model[section.key];
+    if (!rowsHost || !Array.isArray(records)) {
+      continue;
+    }
+
+    const invalidRows = invalidRowMap[section.key] ?? new Set();
+    for (let index = 0; index < records.length; index += 1) {
+      const row = rowsHost.children[index];
+      if (row) {
+        row.className = invalidRows.has(index) ? 'editor-row invalid-row' : 'editor-row';
+      }
+    }
+  }
+}
+
 function updateStatusPanels(dom, state) {
   const validation = validateModel(state.model);
   const effectiveFileName = getEffectiveFileName(state.fileName);
@@ -766,7 +784,7 @@ function updateStatusPanels(dom, state) {
   updateSectionCapacityState(dom, state.model);
 
   if (state.invalidRowSignature !== invalidRowSignature) {
-    renderAllSections(dom, state.model, invalidRowMap);
+    updateInvalidRowClasses(dom, state.model, invalidRowMap);
     state.invalidRowSignature = invalidRowSignature;
   }
 
@@ -822,46 +840,6 @@ function updateStatusPanels(dom, state) {
   if (dom.exportModelButton) {
     dom.exportModelButton.disabled = true;
   }
-  return;
-
-  if (validation.valid) {
-    const serialized = serializeModel(state.model);
-    if (dom.statusMessage) {
-      dom.statusMessage.className = 'status status--ok';
-      dom.statusMessage.textContent =
-        `模型有效：${state.model.nodes.length} 个节点、` +
-        `${state.model.elements.length} 个单元、` +
-        `${state.model.loads.length} 条荷载、` +
-        `${state.model.constraints.length} 条约束。`;
-    }
-    if (dom.errorMessage) {
-      dom.errorMessage.className = 'status status--error';
-      dom.errorMessage.textContent = state.lastError || '当前没有错误。';
-    }
-    if (dom.serializedPreview) {
-      dom.serializedPreview.textContent = serialized;
-    }
-    if (dom.exportModelButton) {
-      dom.exportModelButton.disabled = false;
-    }
-    return;
-  }
-
-  if (dom.statusMessage) {
-    dom.statusMessage.className = 'status status--error';
-    dom.statusMessage.textContent = `模型当前不可导出：${validation.errors.length} 个问题待修正。`;
-  }
-  if (dom.errorMessage) {
-    dom.errorMessage.className = 'status status--error';
-    dom.errorMessage.textContent = state.lastError || validation.errors.join('；');
-  }
-  if (dom.serializedPreview) {
-    dom.serializedPreview.textContent =
-      '# 当前模型校验失败，无法生成 .model 预览\n' + validation.errors.join('\n');
-  }
-  if (dom.exportModelButton) {
-    dom.exportModelButton.disabled = true;
-  }
 }
 
 function replaceModel(state, dom, nextModel) {
@@ -882,16 +860,6 @@ function applyImportText(text, state, dom) {
 
   replaceModel(state, dom, parsed.model);
   return validateModel(parsed.model).valid;
-
-  const validation = validateModel(parsed.model);
-  if (!validation.valid) {
-    state.lastError = validation.errors.join('；');
-    updateStatusPanels(dom, state);
-    return false;
-  }
-
-  replaceModel(state, dom, parsed.model);
-  return true;
 }
 
 function updateSingleField(section, event, state, dom) {
