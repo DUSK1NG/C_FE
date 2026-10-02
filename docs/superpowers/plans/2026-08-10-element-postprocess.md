@@ -4,7 +4,7 @@
 
 **Goal:** 在固定容量二维桁架模型中新增单元后处理 API，使用完整节点位移计算杆件伸长、应变、应力、轴力和拉压状态。
 
-**Architecture:** 新增独立的 `postprocess` 模块，不把后处理逻辑塞入现有 `fem.c` 或 `solver.c`。模块只读 `Element` 和 Stage 5 产生的完整位移向量，使用全局 DOF 映射完成方向投影；失败时清零结果且不修改输入。测试先定义公共契约，再实现最小生产代码，最后接入 Dockerfile 的 Stage 6 测试步骤并记录整条阶段链路的验证结果。
+**Architecture:** 新增独立的 `postprocess` 模块，不把后处理逻辑塞入现有 `fem.c` 或 `solver.c`。模块只读 `Element` 和 Stage 5 产生的完整位移向量，使用全局 DOF 映射完成方向投影；失败时清零结果且不修改输入。测试先定义公共契约，再实现最小生产代码，最后接入 Dockerfile 的 Stage 6 测试步骤。
 
 **Tech Stack:** C11；`C:\\msys64\\ucrt64\\bin\\gcc.exe`；`-Wall -Wextra -pedantic`；标准 C 库 `math.h`、`string.h`、`float.h`；固定容量栈上数组；无第三方库、无动态内存。
 
@@ -29,7 +29,7 @@
 | `tests/test_stage6.c` | 定义正常结果、符号状态、三角桁架回归和失败语义 |
 | `Dockerfile` | 增加 Stage 6 测试的编译与运行步骤，不改变 Demo 运行语义 |
 | `docs/superpowers/specs/2026-08-10-element-postprocess-design.md` | 已批准的设计规范 |
-| `docs/superpowers/plans/2026-08-10-element-postprocess.md` | 本实施计划及最终实际验证记录 |
+| `docs/superpowers/plans/2026-08-10-element-postprocess.md` | 本实施计划 |
 
 ## Task 1: 定义 Stage 6 公共契约和失败测试
 
@@ -215,7 +215,7 @@ git commit -m "feat: calculate stage 6 element results"
 
 **Interfaces:**
 - Consumes: Task 2 的 `src/postprocess.c` 和 `include/postprocess.h`。
-- Produces: Dockerfile 中可独立构建并运行的 Stage 6 测试，以及有真实退出码的最终验收记录。
+- Produces: Dockerfile 中可独立构建并运行的 Stage 6 测试。
 
 - [ ] **Step 1: 增加 Dockerfile Stage 6 测试命令**
 
@@ -294,63 +294,9 @@ git status --short
 
 预期：差异无空白错误；文件范围仅为计划内的 Stage 6 头文件、实现、测试、Dockerfile 和计划文档；动态内存搜索无匹配（`rg` 退出码 1 是预期）；工作树在提交后干净。
 
-- [ ] **Step 5: 在计划末尾记录真实验收结果**
-
-追加“执行结果”章节，填写实际日期、编译器版本、Stage 1–6 和 Demo 的编译/运行输出与退出码、Docker 等价命令、`docker version` 限制、既有警告、提交 ID 和最终范围。只有真实返回 0 的命令标记 `[x]`，Docker 引擎不可用时不标记真实镜像验收。
-
-- [ ] **Step 6: 提交集成与验收记录**
-
-```powershell
-git add Dockerfile docs/superpowers/plans/2026-08-10-element-postprocess.md
-git commit -m "docs: record stage 6 verification"
-```
-
-## Execution results (2026-08-10)
-
-### Final-review documentation correction
-
-- The static allocation check is intentionally focused on calls: `rg -n "\b(malloc|calloc|realloc|free)\s*\(" src include tests`. Exit code `1` with no output is the expected result when no allocation calls are present.
-- Do not use the broad word search `rg -n "\b(malloc|calloc|realloc|free)\b" src include tests` as allocation evidence: existing Stage 3/5 test labels use the word `free`, creating false positives without demonstrating allocation calls.
-- Pre-fix static-check record at `d0e4556`:
-  - `git diff --check e0eafaf..HEAD`: exit `0`; no output.
-  - `git diff --name-status e0eafaf..HEAD`: exit `0`; `M Dockerfile`; `A docs/superpowers/plans/2026-08-10-element-postprocess.md`; `A docs/superpowers/specs/2026-08-10-element-postprocess-design.md`; `A include/postprocess.h`; `A src/postprocess.c`; `A tests/test_stage6.c`.
-  - Focused allocation-call search: exit `1`; no output (expected).
-  - `git status --short`: exit `0`; no output.
-- The complete Stage 6 chain before the final-review fix commit is `e0eafaf..d0e4556`: design `129f19c` -> plan `ab060b8` -> tests `9f3a811` -> implementation `84d8dda` -> verification record `4b7675c` -> completion of verification record `d0e4556`.
-- After committing this documentation fix, record that commit's SHA in this verification record.
-
-- [x] Compiler: `C:\\msys64\\ucrt64\\bin\\gcc.exe`; `gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`; version-command exit code `0`.
-- [x] Stage 1: compile `0`, run `0`; output: `Stage 1 tests passed.`
-- [x] Stage 2: compile `0`, run `0`; output: `Stage 2 tests passed.`
-- [x] Stage 3: compile `0`, run `0`; output: `Stage 3 tests passed.`
-- [x] Stage 4: compile `0`, run `0`; output: `Stage 4 tests passed.`
-- [x] Stage 5: compile `0`, run `0`; output: `Stage 5 contract tests passed.`
-- [x] Stage 6: compile `0`, run `0`; output: `Stage 6 element postprocess contract tests passed.`
-- [x] Demo: compile `0`, run `0`; its source set remains `src/main.c src/fem.c src/solver.c`. Actual output:
-
-  ```text
-  Stage 1: single 2D truss element
-  Length = 943.398113205660 mm
-  c = 0.529998940003
-  s = 0.847998304005
-  Element stiffness matrix [N/mm]:
-     6252.796483  10004.474373  -6252.796483 -10004.474373
-    10004.474373  16007.158997 -10004.474373 -16007.158997
-    -6252.796483 -10004.474373   6252.796483  10004.474373
-   -10004.474373 -16007.158997  10004.474373  16007.158997
-  ```
-- [x] Dockerfile-equivalent local check: `tests/test_stage6.c src/postprocess.c -Iinclude -o c_fe_stage6_docker_equivalent.exe -lm` compiled with exit `0` and ran with exit `0`; output: `Stage 6 element postprocess contract tests passed.`
-- [ ] Real Docker image build was not run. The `docker` CLI is unavailable: direct `docker version` invocation produced PowerShell `CommandNotFoundException`, so there is no Docker process exit code to record; `where.exe docker` actually returned `1`. No image or engine validation is claimed.
-- Existing warnings: Stage 1, Stage 2, and Demo compilation retain `-Wmissing-field-initializers` warnings for existing `Node` initializers that omit `fx`; every affected compile command exited `0`. This task did not alter those source files.
-- Stage 6 commit chain: plan `ab060b8` -> Task 1 `9f3a811` (`test: define stage 6 element postprocess contract`) -> Task 2 `84d8dda` (`feat: calculate stage 6 element results`) -> Task 3 `4b7675c` (`docs: record stage 6 verification`).
-- Final Task 3 scope: Dockerfile adds a standalone Stage 6 compile/run pair after Stage 1 without changing the `fem` source list or `CMD ["./fem"]`; this plan appends the real verification record.
-- Non-blocking deferred Task 1 Minor: improve per-field failure labels in `expect_result_zero()`; it remains outside the permitted Task 3 source/test scope.
-
 ## 完成条件
 
-- Stage 6 设计规范与本计划均已提交。
-- Task 1–3 各自完成提交，并通过对应测试和任务审查。
-- Stage 1–6 及 Demo 的实际编译、运行退出码全部为 0。
+- Stage 1–6 及 Demo 的编译、运行命令均返回 0。
 - 三角桁架三个单元的轴力、应力和拉压状态与参考结果一致。
 - Dockerfile 的 Stage 6 等价 GCC 检查通过；真实 Docker 构建的可用性按环境实际记录。
 - `git diff --check` 通过，工作树干净，Stage5 工作树和 PR #4 不受修改。

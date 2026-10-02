@@ -272,7 +272,6 @@ git commit -m "feat: connect browser model analysis workflow"
 ### Task 5: Full verification and handoff
 
 **Files:**
-- Modify: `.superpowers/sdd/2026-08-13-browser-analysis/progress.md`
 - Create: `.superpowers/sdd/2026-08-13-browser-analysis/task-5-report.md`
 
 - [ ] **Step 1: Run the complete web verification**
@@ -296,7 +295,6 @@ Verify `web/index.html` references the stylesheet and script, contains the analy
 
 - [ ] **Step 4: Write the final report and ledger**
 
-Record changed files, test commands, pass counts, browser `file://` limitation, and any deferred minor coverage in `task-5-report.md`. Mark Tasks 1–5 complete in `progress.md`.
 
 - [ ] **Step 5: Commit the verification report**
 

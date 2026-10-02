@@ -25,7 +25,6 @@
 - Modify: tests/test_stage1.c — 用指定字段完整初始化 Node。
 - Modify: tests/test_stage2.c — 用指定字段完整初始化 Node。
 - Modify: src/main.c — 用指定字段完整初始化演示程序的 Node。
-- Create: docs/superpowers/verification/2026-08-12-warning-free-maintainability.md — 记录严格编译、契约测试和 Docker 验证结果。
 
 ## Task 1: 建立共享矩阵限定符适配并清理 Stage7 警告
 
@@ -276,7 +275,6 @@ demo:    src/main.c           src/fem.c src/solver.c
 ## Task 4: 完成验证记录并检查基线分支未受影响
 
 **Files:**
-- Create: docs/superpowers/verification/2026-08-12-warning-free-maintainability.md
 - Test: 完整本地测试、Docker 构建与运行（Docker 引擎可用时）
 
 **Interfaces:**
@@ -295,37 +293,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Docker run failed' }
 ~~~
 
 如果 Docker 引擎不可用，在验证文档中明确记录命令、失败原因和“未执行真实镜像验收”，不得将其描述为通过。
-
-- [ ] **Step 2: 编写验证记录**
-
-验证文档至少记录：
-
-~~~text
-基线：f109bcd Merge pull request #6
-工作分支：optimization-warning-cleanup
-本地编译：Stage1–Stage10 + demo，严格 C11，全部退出码 0，无 warning
-本地运行：Stage1–Stage10 + demo，全部通过
-Stage9 平台说明：Windows 无便携式确定性满设备写失败等价物，因此既有测试跳过
-Docker：记录实际 build/run 结果或不可用原因
-基线分支：stage9-results-output 工作区干净，HEAD 未改变
-~~~
-
-- [ ] **Step 3: 最终检查并提交验证记录**
-
-运行：
-
-~~~powershell
-git diff --check
-git status --short --branch
-git log --oneline --decorate -4
-~~~
-
-确认优化分支只包含本计划范围内的提交和文档，然后提交：
-
-~~~powershell
-git add docs/superpowers/verification/2026-08-12-warning-free-maintainability.md
-git commit -m "docs: record warning cleanup verification"
-~~~
 
 - [ ] **Step 4: 核对原分支未变化**
 

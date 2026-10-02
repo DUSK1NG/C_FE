@@ -137,7 +137,6 @@ git commit -m "feat: add stage 9 results exporters"
 
 **Files:**
 - Modify: `Dockerfile`
-- Create: `docs/superpowers/verification/2026-08-12-results-output-verification.md`
 
 **Interfaces:**
 - Docker retains the existing Demo, Stage1, Stage6, and Stage7 checks and adds a strict Stage9 compile/run after Stage8.
@@ -183,7 +182,7 @@ Record the Stage1–9 compile/run results, Demo result, Docker result, warning f
 - [ ] **Step 5: Commit integration evidence**
 
 ```text
-git add Dockerfile docs/superpowers/verification/2026-08-12-results-output-verification.md
+git add Dockerfile
 git commit -m "test: verify stage 9 results output"
 ```
 

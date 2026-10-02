@@ -1,7 +1,7 @@
 # Stage 5：自由度缩减与位移回代设计
 
 - 设计日期：2026-08-10
-- 设计状态：已实现、已验证
+- 设计状态：已实现
 - 工作分支：`stage5-dof-reduction`
 - 基线：已合并 Stage 4 的 `stage3-loads-constraints`
 

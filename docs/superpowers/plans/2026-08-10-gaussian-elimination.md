@@ -37,7 +37,7 @@
 | src/solver.c | 实现清零、输入检查、局部复制、部分主元消元和回代 |
 | tests/test_stage4.c | 验证可解系统、换行、奇异矩阵、错误路径和输入保护 |
 | docs/superpowers/specs/2026-08-10-gaussian-elimination-design.md | 已批准的 Stage 4 设计契约 |
-| docs/superpowers/plans/2026-08-10-gaussian-elimination.md | 本实施计划和验收记录 |
+| docs/superpowers/plans/2026-08-10-gaussian-elimination.md | 本实施计划 |
 
 ## Task 1: 定义 Stage 4 契约并编写失败测试
 
@@ -260,7 +260,7 @@ git commit -m "feat: add partial-pivot gaussian elimination"
 
 **Interfaces:**
 - Consumes: Task 2 的 solver 实现和全部既有阶段接口。
-- Produces: 可审查的 Stage 4 验收记录和干净的提交范围。
+- Produces: Stage 4 回归与提交范围。
 
 - [x] **Step 1: 编译并运行全部阶段测试**
 
@@ -280,17 +280,6 @@ gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c 
 
 四个测试分别应输出 Stage 1, Stage 2, Stage 3, Stage 4 passed.
 
-Actual command results:
-
-- `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage1.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1.exe" -lm` — exit `0`.
-- `& "$env:TEMP\c_fe_stage1.exe"` — exit `0`; output `Stage 1 tests passed.`
-- `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage2.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage2.exe" -lm` — exit `0`.
-- `& "$env:TEMP\c_fe_stage2.exe"` — exit `0`; output `Stage 2 tests passed.`
-- `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage3.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage3.exe" -lm` — exit `0`.
-- `& "$env:TEMP\c_fe_stage3.exe"` — exit `0`; output `Stage 3 tests passed.`
-- `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage4.exe" -lm` — exit `0`.
-- `& "$env:TEMP\c_fe_stage4.exe"` — exit `0`; output `Stage 4 tests passed.`
-
 - [x] **Step 2: 运行现有 Stage 1 示例程序**
 
 ~~~powershell
@@ -299,11 +288,6 @@ gcc -std=c11 -Wall -Wextra -pedantic src\main.c src\fem.c -Iinclude -o "$env:TEM
 ~~~
 
 示例程序必须退出码为 0，并继续输出既有单元长度、方向余弦和 4×4 刚度矩阵。
-
-Actual command results:
-
-- `gcc -std=c11 -Wall -Wextra -pedantic src\main.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1_demo.exe" -lm` — exit `0`.
-- `& "$env:TEMP\c_fe_stage1_demo.exe"` — exit `0`; output included unit length, direction cosines, and the 4×4 stiffness matrix.
 
 - [x] **Step 3: 检查范围、禁止项和格式**
 
@@ -315,79 +299,4 @@ git diff --name-status origin/stage3-loads-constraints..HEAD
 rg -n "build_reduced_system|Kff|Uf|displacement|solver\.c|solver\.h" src include tests
 ~~~
 
-允许出现 Stage 4 的 solver.c、solver.h、solve_linear_system 和测试引用；不得新增自由度缩减、位移恢复、文件输入、后处理或动态内存模块。确认 git status --short 只包含计划文档自身的验收记录变更。
-
-The exact Task 3 scope check was `git diff --name-status e1e6b2b70e3882fff89b696b0a0680f3c871e732..c5e421298b576baf41a22f67f28ef9a9dbe57790` — exit `0`; the only entry was `M docs/superpowers/plans/2026-08-10-gaussian-elimination.md`, representing the two documentation commits in the acceptance-record chain. The origin-branch comparison remains supplementary. `git diff --check` exited `0`.
-
-- [x] **Step 4: 在计划中记录验收结果并提交文档**
-
-记录实际使用的编译器版本、每个测试退出码、git diff --check 结果、提交 ID 和任何明确延期的非阻塞观察项，然后提交：
-
-~~~powershell
-git add docs/superpowers/plans/2026-08-10-gaussian-elimination.md
-git commit -m "docs: record stage 4 verification"
-~~~
-
-## Self-Review Checklist
-
-- [x] 设计文档中的接口、状态码、容差和失败清零语义全部有对应任务。
-- [x] 测试覆盖普通求解、部分主元换行、3×3 回代、奇异矩阵、非有限输入、参数错误、输入不变和输出尾部清零。
-- [x] 没有把 Stage 5 的自由度缩减或位移恢复提前加入 Stage 4。
-- [x] Stage 1、Stage 2、Stage 3 既有测试和主程序输出保持兼容。
-- [x] 所有编译使用 -std=c11 -Wall -Wextra -pedantic，且命令退出码被明确检查。
-- [x] 计划中的实际提交 ID、测试结果和范围检查结果在完成后补齐。
-
-## Task 3 Acceptance Record
-
-- Verification date: 2026-08-10; workspace: `C:\Users\jking1\Desktop\my-project\c_FE-stage4-gaussian-elimination`.
-- Baseline before documentation: `e1e6b2b70e3882fff89b696b0a0680f3c871e732`.
-- Historical acceptance-record commit chain: `3b4e114984294847adf34e5f5b99874bebacdb8b` (`docs: record stage 4 verification`) followed by `c5e421298b576baf41a22f67f28ef9a9dbe57790` (`docs: finalize stage 4 acceptance record`). This record identifies those commits only and intentionally makes no claim about the moving current HEAD.
-- Compiler: UCRT64 GCC 16.1.0 (`gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`).
-- All requested test compile and run commands used `-std=c11 -Wall -Wextra -pedantic`, placed executables under `%TEMP%`, and exited 0:
-  - Stage 1: `Stage 1 tests passed.`
-  - Stage 2: `Stage 2 tests passed.`
-  - Stage 3: `Stage 3 tests passed.`
-  - Stage 4: `Stage 4 tests passed.`
-- Stage 1 example compile and run exited 0. Output retained the unit length, direction cosines, and 4x4 element stiffness matrix.
-- `git diff --check`: exit 0, no output.
-- `git diff --name-status origin/stage3-loads-constraints..HEAD`: exit 0; listed the pre-existing Stage 4 implementation/specification baseline files, not a Task 3 source change.
-- The required reference scan returned exit 0 with only allowed `solver.h`/`solver.c` references. The precise forbidden API and Stage 5 concept scans returned exit 1 for no matches; scripts explicitly interpreted that as the expected pass result.
-- Protected-file scan: no changes to `src/main.c`, Docker configuration, or Stage 1/2/3 test files. The Task 3 worktree was clean before this documentation update.
-- Temporary executables were removed and verified absent.
-- Non-blocking observation: GCC emitted existing `-Wmissing-field-initializers` warnings in Stage 1/2 tests and `src/main.c`; all compiles and runs still exited 0.
-- The tracked per-command entries and exit codes in this plan are the durable verification record. Any ignored `.superpowers/sdd` transcript is supplemental and is not required after merge.
-
-Task 3 acceptance steps are complete after this record is committed.
-
-## Final Review Fix Acceptance Record
-
-- Fix-wave date: 2026-08-10; baseline: `e126f08e99628191c6c0c91a09546c13842baf0d`; workspace: `C:\Users\jking1\Desktop\my-project\c_FE-stage4-gaussian-elimination`.
-- Compiler identification: `C:\msys64\ucrt64\bin\gcc.exe --version` — exit `0`; first line `gcc.exe (Rev5, Built by MSYS2 project) 16.1.0`.
-- TDD regression proof before the solver fix:
-  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage4_red.exe" -lm` — exit `0`, no warnings after correcting the two-dimensional test helper signature.
-  - `& "$env:TEMP\c_fe_stage4_red.exe"` — exit `1`; output `FAIL: DBL_MAX solution[0], actual = -nan(ind), expected = 0.000000000000`.
-- Completion-review scaling boundary proof:
-  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage4_power_scale_red.exe" -lm` — exit `0`, no output.
-  - `& "$env:TEMP\c_fe_stage4_power_scale_red.exe"` — exit `1`; output `FAIL: DBL_MAX finite solution, actual status = 8, expected status = 0`, demonstrating the rounding defect in direct maximum-value division.
-  - After switching to common power-of-two scaling, the same compile command with output `$env:TEMP\c_fe_stage4_power_scale_green.exe` exited `0`, and that executable exited `0` with `Stage 4 tests passed.`
-- Final Stage 4 and focused regression verification:
-  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage4.c src\solver.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage4_final.exe" -lm` — exit `0`, no output.
-  - `& "$env:TEMP\c_fe_stage4_final.exe" --extreme-scale` — exit `0`; output `Stage 4 DBL_MAX regression passed.`
-  - `& "$env:TEMP\c_fe_stage4_final.exe"` — exit `0`; output `Stage 4 tests passed.`
-- Full Stage 1–4 and Stage 1 example regression:
-  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage1.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1_final.exe" -lm` — exit `0`; emitted only the pre-existing `Node.fx` missing-initializer warnings.
-  - `& "$env:TEMP\c_fe_stage1_final.exe"` — exit `0`; output `Stage 1 tests passed.`
-  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage2.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage2_final.exe" -lm` — exit `0`; emitted only the pre-existing `Node.fx` missing-initializer warnings.
-  - `& "$env:TEMP\c_fe_stage2_final.exe"` — exit `0`; output `Stage 2 tests passed.`
-  - `gcc -std=c11 -Wall -Wextra -pedantic tests\test_stage3.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage3_final.exe" -lm` — exit `0`, no output.
-  - `& "$env:TEMP\c_fe_stage3_final.exe"` — exit `0`; output `Stage 3 tests passed.`
-  - Stage 4 compile/run results are recorded in the preceding focused-verification list and form the Stage 4 portion of the full regression.
-  - `gcc -std=c11 -Wall -Wextra -pedantic src\main.c src\fem.c -Iinclude -o "$env:TEMP\c_fe_stage1_demo_final.exe" -lm` — exit `0`; emitted only the pre-existing `Node.fx` missing-initializer warnings.
-  - `& "$env:TEMP\c_fe_stage1_demo_final.exe"` — exit `0`; output retained length `943.398113205660 mm`, direction cosines, and the 4×4 stiffness matrix.
-- Scope and formatting checks:
-  - `git -c core.autocrlf=false diff --check` — exit `0`, no output.
-  - `git diff --name-status` — exit `0`; only this plan, the Stage 4 design, `src/solver.c`, and `tests/test_stage4.c` were modified.
-  - `git diff --name-only -- src\main.c Dockerfile compose.yaml tests\test_stage1.c tests\test_stage2.c tests\test_stage3.c` — exit `0`, no output.
-  - The guarded `rg` scan for Stage 5 APIs/concepts and dynamic-memory calls — exit `0`; output `no forbidden Stage 5 or dynamic-memory matches`.
-- Arithmetic failures from finite inputs reuse `FEM_SINGULAR_MATRIX`; no status code, status text, or public header change was required. Non-finite inputs retain `FEM_INVALID_ARGUMENT`. Common power-of-two scaling preserves representable extreme solutions such as `A=[1], b=[DBL_MAX]` while bounding the reviewed elimination case.
-- The tracked entries above are the durable final-fix command and exit-code record; the ignored final SDD report is supplemental.
+允许出现 Stage 4 的 solver.c、solver.h、solve_linear_system 和测试引用；不得新增自由度缩减、位移恢复、文件输入、后处理或动态内存模块。

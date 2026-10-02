@@ -185,13 +185,3 @@ tests/test_stage2.c 必须测试：三角桁架 3 节点/3 单元的完整 6×6 
 
     git add docs\superpowers\plans\2026-08-10-stage2-global-stiffness.md
     git commit -m "docs: record stage 2 assembly verification"
-
-## 执行结果（2026-08-10）
-
-- Stage 2 测试：通过，输出 `Stage 2 tests passed.`。
-- Stage 1 回归：通过，输出 `Stage 1 tests passed.`。
-- Stage 1 演示：通过，长度、方向余弦和 4×4 矩阵输出保持不变。
-- 编译器：MSYS2 UCRT64 GCC 16.1.0 已安装并可用。
-- Docker CLI/Compose：Docker 29.6.2、Compose 5.3.1 已安装。
-- Docker 引擎：未完成；当前 WSL 2 尚未就绪，`docker info` 超时，因此未宣称 Docker 构建验收通过。
-- 提交：`0b85c55`（测试契约）和 `cc33e8a`（组装实现）。

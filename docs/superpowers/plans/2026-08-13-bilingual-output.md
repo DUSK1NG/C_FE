@@ -15,9 +15,3 @@
 2. [x] 修改 `src/output.c` 的 TXT、Markdown、CSV writer，运行 Stage 9 和输出选择测试。
 3. [x] 更新 README，重新编译 `fem.exe`，生成并检查真实 TXT/Markdown/CSV 示例。
 4. [x] 运行完整 C11 回归和 CSV 列结构检查，准备提交并合并回 `main`。
-
-## 验证结果
-
-- Stage 1–10、统一管线、输出选择和 CLI 测试全部通过。
-- TXT 和 Markdown 已验证包含中英文标题、章节、字段名及单元状态。
-- CSV 已验证为 23 列，原英文字段顺序保留，中文记录标签和双语状态列均有值。

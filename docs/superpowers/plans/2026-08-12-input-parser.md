@@ -209,7 +209,6 @@ git commit -m "feat: parse fixed-capacity truss model files"
 
 **Files:**
 - Modify: Dockerfile
-- Create: docs/superpowers/verification/2026-08-12-input-parser-verification.md
 
 **Interfaces:**
 - Consumes: Task 2 的 io 模块、样例文件和 Stage8 测试。
@@ -262,15 +261,6 @@ git diff --name-status 24d3854..HEAD
 ~~~
 
 Expected：无空白错误、Stage8 不引入动态内存、工作区干净且分支为 stage8-input-parser；未修改 Stage7 工作区。
-
-- [ ] **Step 6: 提交验证记录**
-
-~~~powershell
-git add Dockerfile docs/superpowers/verification/2026-08-12-input-parser-verification.md
-git commit -m "test: verify stage 8 input parser"
-~~~
-
-只有在本地和 Docker 验证均获得真实退出码后，才可报告 Stage8 完成。暂不推送、创建 PR 或合并；Stage9–10 仍需在后续阶段完成。
 
 ## 完成标准
 
