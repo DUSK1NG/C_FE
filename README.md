@@ -1,123 +1,49 @@
-# 二维桁架有限元（C11）
-
-一个固定容量、无动态内存分配的二维桁架有限元示例项目。项目已完成 Stage 1–10，支持读取 `.model` 文件、求解并输出 TXT、Markdown、CSV 结果。
+# 二维桁架有限元
+这是一个 C11 命令行程序，用二维桁架模型计算节点位移、支座反力和单元结果，并导出 TXT、Markdown 与 CSV 报告。
 
 ## 快速开始
 
-在仓库根目录编译并运行中型示例。
-
-### Windows PowerShell（MSYS2 UCRT64）
+先将支持 C11 的 GCC 加入 PATH；Windows 使用 UCRT 运行库版本（如 MSYS2 UCRT64）。在仓库根目录编译并运行中型示例：
 
 ```powershell
-$gcc = "C:\msys64\ucrt64\bin\gcc.exe"
+$gcc = (Get-Command gcc).Source
 & $gcc -std=c11 -Wall -Wextra -pedantic `
   src\main.c src\cli.c src\pipeline.c src\fem.c src\solver.c `
   src\reactions.c src\postprocess.c src\io.c src\output.c `
   -Iinclude -o fem.exe -lm
-
 New-Item -ItemType Directory -Force results | Out-Null
-& .\fem.exe --input .\tests\data\medium.model `
-  --output-dir .\results --prefix medium
+& .\fem.exe --input .\tests\data\medium.model --output-dir .\results --prefix medium
+Get-ChildItem results -Name
 ```
 
-### Linux / macOS
-
-```bash
-gcc -std=c11 -Wall -Wextra -pedantic \
-  src/main.c src/cli.c src/pipeline.c src/fem.c src/solver.c \
-  src/reactions.c src/postprocess.c src/io.c src/output.c \
-  -Iinclude -o fem -lm
-
-mkdir -p results
-./fem --input tests/data/medium.model --output-dir results --prefix medium
-```
-
-结果文件会生成在 `results/`：
+实际生成的文件名：
 
 ```text
-medium.txt
-medium.md
 medium.csv
+medium.md
+medium.txt
 ```
 
-TXT 和 Markdown 使用中英文双语标题、字段名和单元状态；CSV 保留原有英文机器字段，并在末尾追加 `record_label_zh` 与 `state_bilingual`，便于程序读取和人工查看。
+## 使用
 
-## 本地网页编辑器
+输入文件依次包含 `NODES`、`ELEMENTS`、`LOADS` 和 `CONSTRAINTS` 分区，字段格式见 [网页编辑器说明](web/README.md)。程序不会换算单位；同一个模型中的坐标、弹性模量、面积和荷载必须使用一致单位制。
 
-直接打开 [`web/index.html`](web/index.html)，无需安装 Docker、Node.js、npm 或启动服务器。
+仓库还提供本地网页编辑器，可在浏览器中导入、编辑、分析和导出 `.model` 文件。网页分析在浏览器 JavaScript 中运行，不能启动 C 命令行求解器。网页使用步骤和模型容量见 [web/README.md](web/README.md)。
 
-网页支持：
+命令行输出格式、报告内容和默认文件名见[命令行使用说明](docs/usage.md)。
 
-- 加载示例或导入 `.model` 文件
-- 编辑节点、单元、荷载和约束
-- 校验数据并预览模型
-- 在浏览器内分析示例和上传的 `.model` 文件
-- 导出规范化的 `.model` 文件
-
-网页分析由浏览器中的 JavaScript 完成，不能直接启动 `fem`；C11 CLI 仍可在终端生成 TXT、Markdown、CSV 结果。详细说明见 [`web/README.md`](web/README.md)。
-
-## `.model` 输入格式
-
-文件必须按以下顺序包含四个分区：
-
-```text
-NODES <count>
-<id> <x> <y>
-
-ELEMENTS <count>
-<id> <node1_id> <node2_id> <E> <A>
-
-LOADS <count>
-<node_id> <fx> <fy>
-
-CONSTRAINTS <count>
-<node_id> <fix_x> <fix_y>
-```
-
-支持空行和以 `#` 开头的整行注释。示例文件位于 [`tests/data`](tests/data)。
-
-## 常用命令
-
-```bash
-# 查看帮助
-./fem --help
-
-# 运行 Stage 1 演示
-./fem --demo
-
-# 使用默认输出文件名
-./fem --input tests/data/medium.model
-
-# 自定义输出目录、文件前缀和格式
-./fem --input tests/data/medium.model \
-  --output-dir results --prefix medium \
-  --format txt,markdown --include nodes,reactions,summary
-```
-
-Windows PowerShell 将 `./fem` 替换为 `& .\fem.exe`。未指定输出选项时，默认生成 `fem_results.txt`、`fem_results.md` 和 `fem_results.csv`。
-
-## 项目结构
-
-```text
-src/       C11 实现
-include/   头文件
-tests/     Stage 1–10 及回归测试
-web/       本地网页模型编辑器
-docs/      设计和开发文档
-```
-
-## 测试
+## 开发
 
 网页模型测试：
 
-```bash
+```powershell
 node tests/test_web_model.js
 ```
 
-C 语言测试程序位于 `tests/`，覆盖 Stage 1–10、统一管线、输出选择和 CLI 解析。
+实际输出：
 
-## 限制
+```text
+web model tests passed
+```
 
-- 使用固定容量数组，不支持无限扩展模型规模。
-- 网页编辑器不会直接执行 C 程序或写入求解结果。
-- 输入模型需要使用一致的单位制，程序不会自动换算单位。
+其他 C 测试程序位于 `tests/`，覆盖求解阶段、统一管线、输出选择和命令行解析。
